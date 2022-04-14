@@ -8,6 +8,10 @@ const AVAIABLE_SERVICES = {
     host: 'compliance-service.compliance-prod.svc.cluster.local',
     port: 8000,
   },
+  [ServiceNames.vulnerability]: {
+    host: 'foo.bar',
+    port: 8000,
+  },
   [ServiceNames.demo]: {
     host: 'foo.bar',
     port: 8000,
