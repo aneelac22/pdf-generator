@@ -46,11 +46,11 @@ export class ReportCache {
    */
   cleanStaleCache(hash: string, fileName: string) {
     setTimeout(() => {
-      apiLogger.info('Calling clean stale cache for: ', fileName);
+      apiLogger.debug('Calling clean stale cache for: ', fileName);
       delete this.cache[hash];
       fse.unlink(sanitizeInput(fileName), (err) => {
         if (err) {
-          apiLogger.warn(`Failed to unlink ${fileName}: ${err}`);
+          apiLogger.warning(`Failed to unlink ${fileName}: ${err}`);
         }
       });
     }, CACHE_TIMEOUT);
@@ -63,7 +63,7 @@ export class ReportCache {
   fetch(hash: string) {
     const entry = this.cache[hash];
     if (!entry) {
-      apiLogger.info(`No such entry ${hash} in cache`);
+      apiLogger.debug(`No such entry ${hash} in cache`);
       return;
     }
     const fileName = entry.filename;
@@ -75,7 +75,7 @@ export class ReportCache {
       delete this.cache[hash];
       fse.unlink(sanitizeInput(fileName), (err) => {
         if (err) {
-          apiLogger.warn(`Failed to unlink ${fileName}: ${err}`);
+          apiLogger.warning(`Failed to unlink ${fileName}: ${err}`);
         }
       });
       return;

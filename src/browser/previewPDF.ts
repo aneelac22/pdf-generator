@@ -39,7 +39,9 @@ const previewPdf = async (
     await page.setContent(renderTemplate(templateConfig, templateData));
 
     // // Enables console logging in Headless mode - handy for debugging components
-    page.on('console', (msg) => apiLogger.info(`[Headless log] ${msg.text()}`));
+    page.on('console', (msg) =>
+      apiLogger.debug(`[Headless log] ${msg.text()}`)
+    );
     const { headerTemplate, footerTemplate } =
       getHeaderAndFooterTemplates(templateConfig);
 
