@@ -49,11 +49,11 @@ router.use('^/$', async (req: PuppeteerBrowserRequest, res, _next) => {
   let service: ServiceNames = req.query.service;
   let template: string = req.query.template;
   if (!service) {
-    apiLogger.info('Missing service, using "demo"');
+    apiLogger.warning('Missing service, using "demo"');
     service = ServiceNames.demo;
   }
   if (!template) {
-    apiLogger.info('Missing template, using "demo"');
+    apiLogger.warning('Missing template, using "demo"');
     template = 'demo';
   }
 
@@ -123,7 +123,7 @@ router.post(
       });
     }
 
-    apiLogger.info(JSON.stringify(pool.stats(), null, 2));
+    apiLogger.debug(JSON.stringify(pool.stats(), null, 2));
 
     try {
       const pathToPdf = await pool.exec<(...args: any[]) => string>(
@@ -151,6 +151,7 @@ router.post(
             },
           });
         }
+        apiLogger.info('Successfully generated report');
       });
     } catch (error: any) {
       const errStr = `${error}`;
@@ -178,7 +179,7 @@ router.post(
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
       const stats = pool.stats();
-      apiLogger.info(JSON.stringify(stats, null, 2));
+      apiLogger.debug(JSON.stringify(stats, null, 2));
       if (
         stats.pendingTasks === 0 &&
         stats.totalWorkers === stats.idleWorkers

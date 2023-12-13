@@ -16,9 +16,9 @@ app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.resolve(__dirname, '..', 'build')));
 app.use(express.static(path.resolve(__dirname, '../public')));
-app.use(requestLogger);
 app.use(httpContext.middleware);
 app.use(identityMiddleware);
+app.use(requestLogger);
 app.use('/', router);
 
 const server = http.createServer({}, app).listen(PORT, () => {

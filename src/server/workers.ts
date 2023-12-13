@@ -3,7 +3,7 @@ import { MaxWorkers } from '../browser/helpers';
 import { apiLogger } from '../common/logging';
 
 const createWorker = () => {
-  apiLogger.info(`New worker created`);
+  apiLogger.debug(`New worker created`);
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call

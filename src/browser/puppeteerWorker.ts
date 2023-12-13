@@ -69,9 +69,9 @@ const generatePdf = async ({
       browser = await puppeteer.connect({
         browserURL: browserUrl,
       });
-      apiLogger.info(`Reusing browser connection`);
+      apiLogger.debug(`Reusing browser connection`);
     } catch (error) {
-      apiLogger.info(`Could not fetch browser status; starting a new browser`);
+      apiLogger.debug(`Could not fetch browser status; starting a new browser`);
       browser = await puppeteer.launch({
         timeout: BROWSER_TIMEOUT,
         headless: true,
@@ -206,9 +206,9 @@ const generatePdf = async ({
 const workerTerminated = (code: number | undefined) => {
   if (typeof code === 'number') {
     const workerResult = code > 0 ? `with error code ${code}` : `successfully`;
-    apiLogger.info(`Worker terminated ${workerResult}`);
+    apiLogger.debug(`Worker terminated ${workerResult}`);
   } else {
-    apiLogger.info(
+    apiLogger.warning(
       `A worker reached a termination issue and no code is available`
     );
   }
