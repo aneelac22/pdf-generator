@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi8/ubi-minimal
 
 USER 0
 
@@ -21,7 +21,7 @@ RUN chmod -R o+rwx node_modules/puppeteer/.local-chromium
 RUN node circular.js
 
 # install puppeteer/chromium dependencies
-RUN microdnf install -y bzip2 fontconfig pango.x86_64 libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 libXext.x86_64 libXi.x86_64 libXtst.x86_64 cups-libs.x86_64 libXScrnSaver.x86_64 libXrandr.x86_64 alsa-lib.x86_64 atk.x86_64 gtk3.x86_64 libdrm libgbm libxshmfence libXScrnSaver alsa-lib wget nss.x86_64 nss
+RUN microdnf install -y bzip2 fontconfig pango.x86_64 libXcomposite.x86_64 libXcursor.x86_64 libXdamage.x86_64 libXext.x86_64 libXi.x86_64 libXtst.x86_64 cups-libs.x86_64 libXScrnSaver.x86_64 libXrandr.x86_64 alsa-lib.x86_64 atk.x86_64 gtk3.x86_64 libdrm libgbm libxshmfence libXScrnSaver alsa-lib wget nss.x86_64 nss GConf2 GConf2.x86_64
 RUN wget -O /pdf-gen/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.5/dumb-init_1.2.5_x86_64
 RUN chmod +x /pdf-gen/bin/dumb-init
 
