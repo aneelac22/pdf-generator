@@ -3,6 +3,7 @@ import config from '../common/config';
 import { apiLogger } from './logging';
 import PdfCache from '../browser/helpers';
 import { KafkaBroker } from 'app-common-js';
+import * as fs from 'fs';
 
 const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
   const socketAddresses: string[] = [];
@@ -15,9 +16,7 @@ const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
 
 const getKafkaSSL = () => {
   if (config?.kafka.brokers[0].caCert) {
-    return {
-      ca: config?.kafka.brokers[0].caCert,
-    };
+    return true;
   }
   return false;
 };
@@ -25,28 +24,28 @@ const getKafkaSSL = () => {
 // Insanity: https://github.com/tulios/kafkajs/issues/1314
 const getKafkaSASL = () => {
   const cfg = config?.kafka.brokers[0];
-  if (cfg.saslConfig !== undefined) {
-    switch (cfg.saslConfig.saslMechanism) {
+  if (cfg.authtype !== undefined) {
+    switch (cfg.sasl.saslMechanism) {
       case 'plain': {
         const sasl: SASLOptions = {
-          username: cfg.saslConfig.username,
-          password: cfg.saslConfig.password,
+          username: cfg.sasl.username,
+          password: cfg.sasl.password,
           mechanism: 'plain',
         };
         return sasl;
       }
-      case 'scram-sha-256': {
+      case 'SCRAM-SHA-256': {
         const sasl: SASLOptions = {
-          username: cfg.saslConfig.username,
-          password: cfg.saslConfig.password,
+          username: cfg.sasl.username,
+          password: cfg.sasl.password,
           mechanism: 'scram-sha-256',
         };
         return sasl;
       }
-      case 'scram-sha-512': {
+      case 'SCRAM-SHA-512': {
         const sasl: SASLOptions = {
-          username: cfg.saslConfig.username,
-          password: cfg.saslConfig.password,
+          username: cfg.sasl.username,
+          password: cfg.sasl.password,
           mechanism: 'scram-sha-512',
         };
         return sasl;
@@ -66,16 +65,10 @@ const KafkaClient = () => {
     return new Kafka({
       clientId: 'crc-pdf-gen',
       brokers: kafkaSocketAddresses(brokers),
-      ssl: ssl,
+      ssl: {
+        ca: [fs.readFileSync('/tmp/kafkaca')],
+      },
       sasl: sasl,
-    });
-  }
-  if (ssl) {
-    apiLogger.debug('just ssl');
-    return new Kafka({
-      clientId: 'crc-pdf-gen',
-      brokers: kafkaSocketAddresses(brokers),
-      ssl: ssl,
     });
   }
   apiLogger.debug('no ssl');
