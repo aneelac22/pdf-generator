@@ -9,6 +9,7 @@ import {
   Config,
 } from 'app-common-js';
 import { UPDATE_TOPIC } from '../browser/constants';
+import * as fs from 'fs';
 
 export type ServicesEndpoints = Omit<
   {
@@ -38,6 +39,7 @@ const defaultConfig: {
     brokers: KafkaBroker[];
     topics: KafkaTopic[];
   };
+  kafkaCaLocation: string;
   APIPrefix: string;
   IS_PRODUCTION: boolean;
   IS_DEVELOPMENT: boolean;
@@ -61,20 +63,24 @@ const defaultConfig: {
       {
         accessKey: process.env.MINIO_ACCESS_KEY as string,
         secretKey: process.env.MINIO_SECRET_KEY as string,
-        requestedName: 'pdfs',
-        name: 'pdfs',
+        requestedName: 'crc-generated-pdfs',
+        name: 'crc-generated-pdfs',
+        region: 'us-east-1',
+        tls: false,
+        endpoint: 'localhost',
       },
     ],
   },
+  kafkaCaLocation: '/tmp/kafkaca',
   kafka: {
     brokers: [
       {
         hostname: 'localhost',
         port: 9092,
-        authType: '',
+        authtype: '',
         caCert: '',
         securityProtocol: '',
-        saslConfig: {
+        sasl: {
           username: 'me',
           password: 'me',
           saslMechanism: '',
@@ -138,6 +144,16 @@ function initializeConfig() {
             endpoints[endpoint.app as keyof ServicesEndpoints] = endpoint;
           }
         });
+      }
+      if (clowderConfig.kafka.brokers[0].caCert != undefined) {
+        try {
+          fs.writeFileSync(
+            '/tmp/kafkaca',
+            clowderConfig.kafka.brokers[0].caCert
+          );
+        } catch (error) {
+          console.log(error);
+        }
       }
       config = {
         ...defaultConfig,
