@@ -11,7 +11,7 @@ objects:
   spec:
     envName: ${ENV_NAME}
     objectStore:
-    - pdfs
+    - ${PDF_BUCKET}
     kafkaTopics:
     - replicas: 1
       partitions: 1
@@ -104,3 +104,6 @@ parameters:
 - description: Logging level for the server
   name: LOG_LEVEL
   value: "debug"
+- description: Dynamic name for the s3 bucket based on env
+  name: PDF_BUCKET
+  value: "crc-generated-pdfs"
