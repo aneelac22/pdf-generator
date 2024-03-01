@@ -12,7 +12,7 @@
     "@patternfly/react-table": "^4.104.7",
     "@patternfly/react-tokens": "^4.93.10",
     "@types/lodash": "^4.14.184",
-    "app-common-js": "^2.2.3",
+    "app-common-js": "^2.2.4",
     "atob": "^2.1.2",
     "axios": "^0.27.2",
     "bluebird": "^3.7.2",
@@ -118,7 +118,13 @@
     "lint:fix": "eslint src --fix",
     "start:server": "NODE_ENV=development npx concurrently \"npx webpack -c ./config/webpack.config.js -w\" \"npx nodemon ./dist/server.js\"",
     "test": "jest",
+    "test:unit": "jest --projects src/unit.jest.config.js",
     "test:visual": "node visual-test.js"
+  },
+  "jest": {
+    "projects": [
+      "src/unit.jest.config.js"
+    ]
   },
   "watch": {
     "build": {

@@ -1,0 +1,107 @@
+{
+  "endpoints": [
+    {
+      "apiPath": "/api/crc-pdf-generator/",
+      "apiPaths": [
+        "/api/crc-pdf-generator/"
+      ],
+      "app": "crc-pdf-generator",
+      "hostname": "crc-pdf-generator-api.crc-pdf-generator-stage.svc",
+      "name": "api",
+      "port": 8000,
+      "tlsPort": 0
+    },
+    {
+      "apiPath": "/api/ros/",
+      "apiPaths": [
+        "/api/ros/"
+      ],
+      "app": "ros-backend",
+      "hostname": "ros-backend-api.ros-stage.svc",
+      "name": "api",
+      "port": 8000,
+      "tlsPort": 0
+    }
+  ],
+  "featureFlags": {
+    "clientAccessToken": "11001110101",
+    "hostname": "unleash.net",
+    "port": 443,
+    "scheme": "https"
+  },
+  "kafka": {
+    "brokers": [
+      {
+        "authtype": "sasl",
+        "cacert": "ca",
+        "hostname": "kafka.com",
+        "port": 9096,
+        "sasl": {
+          "password": "pass",
+          "saslMechanism": "SCRAM-SHA-512",
+          "securityProtocol": "SASL_SSL",
+          "username": "user"
+        },
+        "securityProtocol": "SASL_SSL"
+      },
+      {
+        "authtype": "sasl",
+        "cacert": "ca",
+        "hostname": "kafka.com",
+        "port": 9096,
+        "sasl": {
+          "password": "pass",
+          "saslMechanism": "SCRAM-SHA-512",
+          "securityProtocol": "SASL_SSL",
+          "username": "user"
+        },
+        "securityProtocol": "SASL_SSL"
+      }
+    ],
+    "topics": [
+      {
+        "name": "pdf-generator.updated.report",
+        "requestedName": "pdf-generator.updated.report"
+      }
+    ]
+  },
+  "logging": {
+    "cloudwatch": {
+      "accessKeyId": "access",
+      "logGroup": "crc-pdf-generator-stage",
+      "region": "us",
+      "secretAccessKey": "secret"
+    },
+    "type": "cloudwatch"
+  },
+  "metricsPath": "/metrics",
+  "metricsPort": 9000,
+  "objectStore": {
+    "buckets": [
+      {
+        "accessKey": "access",
+        "endpoint": "s3.com",
+        "name": "crc-generated-pdfs-stage",
+        "region": "us",
+        "requestedName": "crc-generated-pdfs-stage",
+        "secretKey": "secret",
+        "tls": true
+      }
+    ],
+    "hostname": "s3.com",
+    "port": 443,
+    "tls": true
+  },
+  "privateEndpoints": [
+    {
+      "app": "vulnerability-engine",
+      "hostname": "stage.vuln",
+      "name": "listener-service",
+      "port": 10000,
+      "tlsPort": 0
+    }
+  ],
+  "privatePort": 10000,
+  "publicPort": 8000,
+  "webPort": 8000
+}
