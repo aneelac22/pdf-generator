@@ -14,16 +14,16 @@ const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
   return socketAddresses;
 };
 
-const getKafkaSSL = () => {
-  if (config?.kafka.brokers[0].caCert) {
+export const getKafkaSSL = (brokers: KafkaBroker[]) => {
+  if (brokers[0].cacert) {
     return true;
   }
   return false;
 };
 
 // Insanity: https://github.com/tulios/kafkajs/issues/1314
-const getKafkaSASL = () => {
-  const cfg = config?.kafka.brokers[0];
+export const getKafkaSASL = (brokers: KafkaBroker[]) => {
+  const cfg = brokers[0];
   if (cfg.authtype !== undefined) {
     switch (cfg.sasl.saslMechanism) {
       case 'plain': {
@@ -58,10 +58,10 @@ const getKafkaSASL = () => {
 
 const KafkaClient = () => {
   const brokers = config?.kafka.brokers;
-  const sasl = getKafkaSASL();
-  const ssl = getKafkaSSL();
+  const sasl = getKafkaSASL(brokers);
+  const ssl = getKafkaSSL(brokers);
   if (ssl && sasl) {
-    apiLogger.debug('sasl and ssl');
+    apiLogger.debug('sasl');
     return new Kafka({
       clientId: 'crc-pdf-gen',
       brokers: kafkaSocketAddresses(brokers),

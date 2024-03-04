@@ -26,6 +26,7 @@ const defaultConfig: {
   webPort: number;
   metricsPort: number;
   metricsPath: string;
+  tlsCAPath: string;
   endpoints: Partial<ServicesEndpoints>;
   objectStore: {
     hostname: string;
@@ -53,6 +54,7 @@ const defaultConfig: {
   metricsPort: 9000,
   metricsPath: '/metrics',
   endpoints: {},
+  tlsCAPath: '',
   objectStore: {
     hostname: 'localhost',
     port: 9100,
@@ -78,7 +80,7 @@ const defaultConfig: {
         hostname: 'localhost',
         port: 9092,
         authtype: '',
-        caCert: '',
+        cacert: '',
         securityProtocol: '',
         sasl: {
           username: 'me',
@@ -145,11 +147,11 @@ function initializeConfig() {
           }
         });
       }
-      if (clowderConfig.kafka.brokers[0].caCert != undefined) {
+      if (clowderConfig.kafka.brokers[0].cacert != undefined) {
         try {
           fs.writeFileSync(
             '/tmp/kafkaca',
-            clowderConfig.kafka.brokers[0].caCert
+            clowderConfig.kafka.brokers[0].cacert
           );
         } catch (error) {
           console.log(error);
@@ -166,7 +168,6 @@ function initializeConfig() {
     return defaultConfig;
   }
 }
-
 const instanceConfig = initializeConfig();
 
 export default instanceConfig;
