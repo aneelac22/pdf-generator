@@ -44,6 +44,7 @@
     "workerpool": "^6.4.0"
   },
   "devDependencies": {
+    "@apidevtools/swagger-cli": "^4.0.4",
     "@babel/core": "^7.19.0",
     "@babel/plugin-transform-runtime": "^7.18.10",
     "@babel/preset-env": "^7.19.0",
@@ -119,7 +120,8 @@
     "start:server": "NODE_ENV=development npx concurrently \"npx webpack -c ./config/webpack.config.js -w\" \"npx nodemon ./dist/server.js\"",
     "test": "jest",
     "test:unit": "jest --projects src/unit.jest.config.js",
-    "test:visual": "node visual-test.js"
+    "test:visual": "node visual-test.js",
+    "api:validate": "swagger-cli validate ./docs/openapi.json"
   },
   "jest": {
     "projects": [

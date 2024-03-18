@@ -14,7 +14,7 @@
   },
   "servers": [
     {
-      "url": "/api/crc-pdf-generator/v1"
+      "url": "/api/crc-pdf-generator"
     }
   ],
   "tags": [
@@ -28,7 +28,7 @@
     }
   ],
   "paths": {
-    "/hello": {
+    "/v1/hello": {
       "get": {
         "tags": [
           "health"
@@ -51,7 +51,7 @@
         }
       }
     },
-    "/generate": {
+    "/v1/generate": {
       "post": {
         "tags": [
           "pdf"
@@ -90,7 +90,7 @@
         }
       }
     },
-    "/create": {
+    "/v2/create": {
       "post": {
         "tags": [
           "pdf"
@@ -122,10 +122,22 @@
         }
       }
     },
-    "/status/:statusID": {
+    "/v2/status/:statusID": {
       "get": {
         "tags": [
           "pdf"
+        ],
+        "parameters": [
+          {
+            "name": "statusID",
+            "in": "path",
+            "description": "ID of PDF",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "description": "Fetch the status of a PDF by the ID",
         "responses": {
@@ -147,10 +159,22 @@
         }
       }
     },
-    "/download/:ID": {
+    "/v2/download/:ID": {
       "get": {
         "tags": [
           "pdf"
+        ],
+        "parameters": [
+          {
+            "name": "ID",
+            "in": "path",
+            "description": "ID of PDF",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "description": "Fetch the rendered PDF by the ID",
         "responses": {
