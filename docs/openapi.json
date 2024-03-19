@@ -362,13 +362,15 @@
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
-          },
-          "filepath": {
-            "type": "string"
-          },
-          "storageLocation": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "filepath": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            }
           }
         }
       },
