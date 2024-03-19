@@ -6,13 +6,13 @@ const minioClient = new Minio.Client({
   endPoint: config?.objectStore.hostname,
   port: config?.objectStore.port,
   useSSL: config?.objectStore.tls,
-  accessKey: config?.objectStore.accessKey,
-  secretKey: config?.objectStore.secretKey,
+  accessKey: config?.objectStore.buckets[0].accessKey,
+  secretKey: config?.objectStore.buckets[0].secretKey,
 });
 
 export const uploadPDF = async (id: string, path: string) => {
   const bucket = config?.objectStore.buckets[0].name;
-  apiLogger.debug(config?.objectStore);
+  apiLogger.debug(`${JSON.stringify(config?.objectStore)}`);
   try {
     const exists = await minioClient.bucketExists(bucket);
     if (!exists) {

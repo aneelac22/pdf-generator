@@ -8,7 +8,6 @@ import * as fs from 'fs';
 const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
   const socketAddresses: string[] = [];
   brokers.map((v: KafkaBroker) => {
-    apiLogger.debug(v);
     socketAddresses.push(`${v.hostname}:${v.port}`);
   });
   return socketAddresses;
@@ -93,6 +92,7 @@ export async function produceMessage(topic: string, message: unknown) {
 
   await producer.disconnect();
 }
+
 export async function consumeMessages(topic: string) {
   const kafka = KafkaClient();
   const consumer = kafka.consumer({ groupId: 'test-group' });
@@ -105,7 +105,7 @@ export async function consumeMessages(topic: string) {
     // eslint-disable-next-line @typescript-eslint/require-await
     eachMessage: async ({ message }) => {
       apiLogger.debug({
-        value: message.value,
+        value: `${JSON.stringify(message.value)}`,
       });
       const cacheObject = JSON.parse(message.value?.toString() as string);
       pdfCache.setItem(cacheObject?.id, {
