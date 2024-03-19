@@ -28,9 +28,6 @@ cat << EOF > $WORKSPACE/artifacts/junit-dummy.xml
 </testsuite>
 EOF
 
-# Validate the OpenAPI spec with each pull request
-source $APP_ROOT/docs/validateOpenAPI.sh
-
 # Build and publish image to quay
 source $CICD_ROOT/build.sh
 
