@@ -122,7 +122,7 @@
         }
       }
     },
-    "/v2/status/:statusID": {
+    "/v2/status/{statusID}": {
       "get": {
         "tags": [
           "pdf"
@@ -159,7 +159,7 @@
         }
       }
     },
-    "/v2/download/:ID": {
+    "/v2/download/{ID}": {
       "get": {
         "tags": [
           "pdf"
@@ -362,13 +362,15 @@
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
-          },
-          "filepath": {
-            "type": "string"
-          },
-          "storageLocation": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "filepath": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            }
           }
         }
       },
