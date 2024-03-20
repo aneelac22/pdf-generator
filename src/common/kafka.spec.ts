@@ -3,7 +3,7 @@ import { getKafkaSASL, getKafkaSSL } from './kafka';
 import { SASLOptions } from 'kafkajs';
 import * as fs from 'fs';
 
-describe('stage', () => {
+describe('stage config', () => {
   it('should have ssl and ca configs', () => {
     const brokers = config?.kafka.brokers;
     const ssl = getKafkaSSL(brokers);

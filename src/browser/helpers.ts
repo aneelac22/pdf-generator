@@ -114,6 +114,7 @@ export const getViewportConfig = (
     ),
   };
 };
+
 type PdfStatus = {
   [statusID: string]: {
     status: string;
