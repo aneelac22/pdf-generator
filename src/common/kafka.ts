@@ -4,6 +4,7 @@ import { apiLogger } from './logging';
 import PdfCache from '../browser/helpers';
 import { KafkaBroker } from 'app-common-js';
 import * as fs from 'fs';
+import * as os from 'os';
 
 const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
   const socketAddresses: string[] = [];
@@ -95,7 +96,7 @@ export async function produceMessage(topic: string, message: unknown) {
 
 export async function consumeMessages(topic: string) {
   const kafka = KafkaClient();
-  const consumer = kafka.consumer({ groupId: 'test-group' });
+  const consumer = kafka.consumer({ groupId: `pdf-gen-${os.hostname()}` });
 
   await consumer.connect();
   await consumer.subscribe({ topic: topic, fromBeginning: true });
@@ -104,14 +105,17 @@ export async function consumeMessages(topic: string) {
     // ESlint is upset here but it has to be async due to kafkajs
     // eslint-disable-next-line @typescript-eslint/require-await
     eachMessage: async ({ message }) => {
-      apiLogger.debug({
-        value: `${JSON.stringify(message.value)}`,
-      });
+      apiLogger.debug(
+        JSON.stringify({
+          value: message.value?.toString(),
+        })
+      );
       const cacheObject = JSON.parse(message.value?.toString() as string);
       pdfCache.setItem(cacheObject?.id, {
         status: cacheObject.status,
         filepath: cacheObject.filepath,
       });
+      apiLogger.debug(JSON.stringify(pdfCache));
     },
   });
 }
