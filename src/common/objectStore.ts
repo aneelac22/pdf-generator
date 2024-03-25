@@ -25,7 +25,7 @@ export const uploadPDF = async (id: string, path: string) => {
   const bucket = config?.objectStore.buckets[0].name;
   apiLogger.debug(`${JSON.stringify(config?.objectStore)}`);
   const mc = MinioClient();
-  apiLogger.debug(`${JSON.stringify(mc)}`);
+  apiLogger.debug(mc);
   try {
     const exists = await mc.bucketExists(bucket);
     if (!exists) {
@@ -45,7 +45,7 @@ export const uploadPDF = async (id: string, path: string) => {
 export const downloadPDF = async (id: string) => {
   const bucket = config?.objectStore.buckets[0].name;
   const mc = MinioClient();
-  apiLogger.debug(`${JSON.stringify(mc)}`);
+  apiLogger.debug(mc);
   try {
     const stream = await mc.getObject(bucket, `${id}.pdf`);
     apiLogger.debug(`PDF found downloading as ${id}.pdf`);
