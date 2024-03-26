@@ -24,6 +24,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { ReportCache } from '../cache';
 import { downloadPDF } from '../../common/objectStore';
 import { Readable } from 'stream';
+import { produceMessage } from '../../common/kafka';
+import { UPDATE_TOPIC } from '../../browser/constants';
 
 const router = Router();
 const cache = new ReportCache();
@@ -119,7 +121,6 @@ router.post(
     if (!isValidPdfRequest(pdfDetails)) {
       const errStr = 'Failed: service and template options must not be empty';
       apiLogger.debug(errStr);
-      pdfCache.setItem(pdfID, { status: errStr, filepath: '' });
       return res.status(400).send({
         error: {
           status: 400,
@@ -130,7 +131,6 @@ router.post(
     }
     pdfDetails.uuid = pdfID;
     apiLogger.debug(pool.stats());
-    pdfCache.setItem(pdfID, { status: 'Received', filepath: '' });
 
     try {
       pool
@@ -138,14 +138,30 @@ router.post(
         .catch((error: unknown) => {
           apiLogger.error(`${error}`);
         });
-      pdfCache.setItem(pdfID, { status: 'Generating', filepath: '' });
+      const updateMessage = { status: 'Generating', filepath: '' };
+      produceMessage(UPDATE_TOPIC, updateMessage)
+        .then(() => {
+          apiLogger.debug('Generating message sent');
+        })
+        .catch((error: unknown) => {
+          apiLogger.error(`Kafka message not sent: ${error}`);
+        });
+      pdfCache.setItem(pdfID, updateMessage);
 
       return res.status(202).send({ statusID: pdfID });
     } catch (error: unknown) {
       const errStr = `${error}`;
       if (errStr.includes('No API descriptor')) {
+        const updateMessage = { status: `Failed: ${errStr}`, filepath: '' };
         apiLogger.error(`Error: ${error}`);
-        pdfCache.setItem(pdfID, { status: `Failed: ${errStr}`, filepath: '' });
+        produceMessage(UPDATE_TOPIC, updateMessage)
+          .then(() => {
+            apiLogger.debug('Generating error sent');
+          })
+          .catch((error: unknown) => {
+            apiLogger.error(`Kafka message not sent: ${error}`);
+          });
+        pdfCache.setItem(pdfID, updateMessage);
         res.status(400).send({
           error: {
             status: 400,
@@ -155,7 +171,15 @@ router.post(
         });
       } else {
         apiLogger.error(`Internal Server error: ${error}`);
-        pdfCache.setItem(pdfID, { status: `Failed: ${error}`, filepath: '' });
+        const updateMessage = { status: `Failed: ${error}`, filepath: '' };
+        produceMessage(UPDATE_TOPIC, updateMessage)
+          .then(() => {
+            apiLogger.debug('Generating error sent');
+          })
+          .catch((error: unknown) => {
+            apiLogger.error(`Kafka message not sent: ${error}`);
+          });
+        pdfCache.setItem(pdfID, updateMessage);
         res.status(500).send({
           error: {
             status: 500,
