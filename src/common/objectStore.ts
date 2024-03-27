@@ -1,56 +1,77 @@
-import * as Minio from 'minio';
 import { apiLogger } from './logging';
 import config from './config';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { createReadStream } from 'fs-extra';
+import { Readable } from 'stream';
 
-export const MinioClient = () => {
+export const StorageClient = () => {
   if (config?.objectStore.tls) {
-    apiLogger.debug('s3 config');
-    return new Minio.Client({
-      endPoint: config?.objectStore.buckets[0].endpoint,
-      accessKey: config?.objectStore.buckets[0].accessKey,
-      secretKey: config?.objectStore.buckets[0].secretKey,
+    apiLogger.debug('aws config');
+    return new S3Client({
+      region: config?.objectStore.buckets[0].region,
+      credentials: {
+        accessKeyId: config?.objectStore.buckets[0].accessKey,
+        secretAccessKey: config?.objectStore.buckets[0].secretKey,
+      },
     });
   }
   apiLogger.debug('minio config');
-  return new Minio.Client({
-    endPoint: config?.objectStore.buckets[0].endpoint,
-    port: config?.objectStore.port,
-    useSSL: config?.objectStore.tls,
-    accessKey: config?.objectStore.buckets[0].accessKey,
-    secretKey: config?.objectStore.buckets[0].secretKey,
+  // endpoint and forcePathStyle are required to work with local minio
+  // region is not populated by the config in eph so we'll use east-1
+  return new S3Client({
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: config?.objectStore.buckets[0].accessKey,
+      secretAccessKey: config?.objectStore.buckets[0].secretKey,
+    },
+    endpoint: `http://${config?.objectStore.hostname}:${config?.objectStore.port}`,
+    forcePathStyle: true,
   });
 };
+
+const s3 = StorageClient();
 
 export const uploadPDF = async (id: string, path: string) => {
   const bucket = config?.objectStore.buckets[0].name;
   apiLogger.debug(`${JSON.stringify(config?.objectStore)}`);
-  const mc = MinioClient();
-  apiLogger.debug(mc);
   try {
-    const exists = await mc.bucketExists(bucket);
-    if (!exists) {
-      apiLogger.debug('Creating a new bucket');
-      await mc.makeBucket(bucket, 'us-east-1');
-    }
-    const metadata = {
-      'Content-Type': 'application/pdf',
+    // Create a read stream for the PDF file
+    const fileStream = createReadStream(path);
+
+    // Define the parameters for the S3 upload
+    const uploadParams = {
+      Bucket: bucket,
+      Key: `${id}.pdf`,
+      Body: fileStream,
+      ContentType: 'application/pdf',
     };
-    await mc.fPutObject(bucket, `${id}.pdf`, path, metadata);
-    apiLogger.debug(`PDF uploaded to ${bucket} as ${id}.pdf`);
-  } catch (error: unknown) {
-    apiLogger.debug(`${error}`);
+
+    // Upload the file to S3
+    const response = await s3.send(new PutObjectCommand(uploadParams));
+    apiLogger.debug(`File uploaded successfully: ${response}`);
+  } catch (error) {
+    apiLogger.debug(`Error uploading file: ${error}`);
   }
 };
 
 export const downloadPDF = async (id: string) => {
   const bucket = config?.objectStore.buckets[0].name;
-  const mc = MinioClient();
-  apiLogger.debug(mc);
   try {
-    const stream = await mc.getObject(bucket, `${id}.pdf`);
+    // Define the parameters for the S3 download
+    const downloadParams = {
+      Bucket: bucket,
+      Key: `${id}.pdf`,
+    };
+
+    // Send the GetObjectCommand to S3
+    const response = await s3.send(new GetObjectCommand(downloadParams));
     apiLogger.debug(`PDF found downloading as ${id}.pdf`);
-    return stream;
-  } catch (error: unknown) {
-    apiLogger.debug(`${error}`);
+    return response.Body as Readable;
+  } catch (error) {
+    apiLogger.debug(`Error downloading file: ${error}`);
   }
 };

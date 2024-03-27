@@ -129,7 +129,6 @@ router.post(
     }
     pdfDetails.uuid = pdfID;
     apiLogger.debug(pool.stats());
-    // TODO: Send to some object store (Redis?)
     pdfCache.setItem(pdfID, { status: 'Received', filepath: '' });
 
     try {
