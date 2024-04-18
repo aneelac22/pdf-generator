@@ -13,5 +13,4 @@ module.exports = {
     ...tsjPreset.transform,
   },
   testMatch: ['./**/*.spec.ts'],
-  preset: 'jest-puppeteer',
 };

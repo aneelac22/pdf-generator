@@ -33,7 +33,6 @@
     "brokers": [
       {
         "authtype": "sasl",
-        "cacert": "ca",
         "hostname": "kafka.com",
         "port": 9096,
         "sasl": {
@@ -46,7 +45,6 @@
       },
       {
         "authtype": "sasl",
-        "cacert": "ca",
         "hostname": "kafka.com",
         "port": 9096,
         "sasl": {

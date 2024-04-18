@@ -15,10 +15,18 @@ const kafkaSocketAddresses = (brokers: KafkaBroker[]) => {
 };
 
 export const getKafkaSSL = (brokers: KafkaBroker[]) => {
-  if (brokers[0].cacert) {
-    return true;
+  const cfg = brokers[0];
+  let ssl: boolean | { ca: Buffer[] } = false;
+  if (cfg.securityProtocol && cfg.securityProtocol.includes('SSL')) {
+    ssl = true;
   }
-  return false;
+
+  if (cfg.cacert) {
+    ssl = {
+      ca: [fs.readFileSync('/tmp/kafkaca')],
+    };
+  }
+  return ssl;
 };
 
 // Insanity: https://github.com/tulios/kafkajs/issues/1314
@@ -65,9 +73,7 @@ const KafkaClient = () => {
     return new Kafka({
       clientId: 'crc-pdf-gen',
       brokers: kafkaSocketAddresses(brokers),
-      ssl: {
-        ca: [fs.readFileSync('/tmp/kafkaca')],
-      },
+      ssl: ssl,
       sasl: sasl,
     });
   }
