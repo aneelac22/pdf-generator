@@ -49,6 +49,12 @@ const defaultConfig: {
   IDENTITY_HEADER_KEY: string;
   ACCOUNT_ID: string;
   LOG_LEVEL: string;
+  scalprum: {
+    // for proxy request to /api
+    apiHost: string;
+    // for proxy request to /apps
+    assetsHost: string;
+  };
 } = {
   webPort: 8000,
   metricsPort: 9000,
@@ -106,6 +112,10 @@ const defaultConfig: {
   IDENTITY_HEADER_KEY: 'x-rh-identity',
   ACCOUNT_ID: '',
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
+  scalprum: {
+    apiHost: process.env.API_HOST || 'https://console.stage.redhat.com/',
+    assetsHost: process.env.ASSETS_HOST || 'https://console.stage.redhat.com/',
+  },
 };
 
 /**

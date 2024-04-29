@@ -16,12 +16,12 @@ import { UPDATE_TOPIC } from '../browser/constants';
 const PORT = config?.webPort;
 
 const assetsProxy = createProxyMiddleware({
-  target: 'http://localhost:8003',
+  target: config.scalprum.apiHost,
   changeOrigin: true,
   pathFilter: (path) => path.startsWith('/apps') || path.startsWith('/api'),
   router: {
-    '/apps/landing': 'http://localhost:8003',
-    '/api': 'https://console.stage.redhat.com/',
+    '/apps': config.scalprum.assetsHost,
+    '/api': config.scalprum.apiHost,
   },
 });
 
