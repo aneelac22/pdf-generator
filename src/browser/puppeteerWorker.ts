@@ -1,6 +1,5 @@
 import WP from 'workerpool';
 import puppeteer, { HTTPRequest } from 'puppeteer';
-import { v4 as uuidv4 } from 'uuid';
 import os from 'os';
 import fs from 'fs';
 import { PdfRequestBody } from '../common/types';
@@ -39,15 +38,15 @@ const redirectFontFiles = async (request: HTTPRequest) => {
 };
 
 const getNewPdfName = () => {
-  const pdfFilename = `report_${uuidv4()}.pdf`;
+  const pdfFilename = `report_${crypto.randomUUID()}.pdf`;
   return `${os.tmpdir()}/${pdfFilename}`;
 };
 
 const generatePdf = async ({
   url,
-  rhIdentity,
-  dataOptions,
+  identity,
   uuid,
+  fetchDataParams,
 }: PdfRequestBody) => {
   const pdfPath = getNewPdfName();
   const createFilename = async () => {
@@ -97,22 +96,28 @@ const generatePdf = async ({
       })
       // }) as undefined // probably a typings issue in puppeteer
     );
-
     await page.setExtraHTTPHeaders({
-      ...(dataOptions
+      ...(fetchDataParams
         ? {
-            [config?.OPTIONS_HEADER_NAME]: JSON.stringify(dataOptions),
+            [config?.OPTIONS_HEADER_NAME]: JSON.stringify(fetchDataParams),
           }
         : {}),
 
-      ...(config?.IS_DEVELOPMENT && !rhIdentity
+      ...(config?.IS_DEVELOPMENT && !identity
         ? {}
-        : { 'x-rh-identity': rhIdentity }),
+        : { 'x-rh-identity': identity }),
     });
 
     // Intercept font requests from chrome and send them from dist
     await page.setRequestInterception(true);
     page.on('request', async (request) => {
+      if (request.url().includes('/api/chrome-service/v1/user')) {
+        // apiLogger.debug(`Requesting: `, request.url());
+        apiLogger.debug(
+          `***************************Requesting: `,
+          request.headers()
+        );
+      }
       await redirectFontFiles(request);
     });
 
@@ -127,6 +132,8 @@ const generatePdf = async ({
         return elem.innerText;
       }
     });
+
+    console.log({ error });
 
     // error happened during page rendering
     if (error && error.length > 0) {
@@ -143,7 +150,9 @@ const generatePdf = async ({
       }
       throw new Error(`Page render error: ${response}`);
     }
-    if (!pageStatus?.ok()) {
+
+    console.log({ ok: pageStatus?.ok() });
+    if (!pageStatus?.ok() && pageStatus?.statusText() !== 'Not Modified') {
       apiLogger.debug(`Page status: ${pageStatus?.statusText()}`);
       throw new Error(
         `Puppeteer error while loading the react app: ${pageStatus?.statusText()}`

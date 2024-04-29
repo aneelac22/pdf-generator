@@ -1,7 +1,5 @@
-import ServiceNames from './service-names';
 import 'dotenv/config';
 import {
-  Endpoint,
   ObjectBucket,
   IsClowderEnabled,
   KafkaBroker,
@@ -11,23 +9,11 @@ import {
 import { UPDATE_TOPIC } from '../browser/constants';
 import * as fs from 'fs';
 
-export type ServicesEndpoints = Omit<
-  {
-    [key in ServiceNames]: Endpoint;
-  } & {
-    'advisor-backend': Endpoint;
-    'ros-backend': Endpoint;
-    'vulnerability-engine-manager-service': Endpoint;
-  },
-  'advisor' | 'ros' | 'vulnerability'
->;
-
 const defaultConfig: {
   webPort: number;
   metricsPort: number;
   metricsPath: string;
   tlsCAPath: string;
-  endpoints: Partial<ServicesEndpoints>;
   objectStore: {
     hostname: string;
     port: number;
@@ -57,9 +43,8 @@ const defaultConfig: {
   };
 } = {
   webPort: 8000,
-  metricsPort: 9000,
+  metricsPort: 9001,
   metricsPath: '/metrics',
-  endpoints: {},
   tlsCAPath: '',
   objectStore: {
     hostname: 'localhost',
@@ -138,7 +123,6 @@ const defaultConfig: {
 
 function initializeConfig() {
   let isClowderEnabled = false;
-  const endpoints: Partial<ServicesEndpoints> = {};
   try {
     let config: typeof defaultConfig = {
       ...defaultConfig,
@@ -147,16 +131,6 @@ function initializeConfig() {
     isClowderEnabled = IsClowderEnabled();
     if (isClowderEnabled) {
       const clowderConfig = clowder.LoadedConfig();
-      if (clowderConfig.endpoints) {
-        clowderConfig.endpoints.forEach((endpoint) => {
-          // special case for vulnerability
-          if (endpoint.name === 'manager-service') {
-            endpoints['vulnerability-engine-manager-service'] = endpoint;
-          } else {
-            endpoints[endpoint.app as keyof ServicesEndpoints] = endpoint;
-          }
-        });
-      }
       if (clowderConfig.kafka.brokers[0].cacert != undefined) {
         try {
           fs.writeFileSync(
@@ -170,7 +144,6 @@ function initializeConfig() {
       config = {
         ...defaultConfig,
         ...clowderConfig,
-        endpoints,
       };
     }
     return config;

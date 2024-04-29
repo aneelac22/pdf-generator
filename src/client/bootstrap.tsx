@@ -5,7 +5,7 @@ import ScalprumProvider, {
   ScalprumComponent,
   ScalprumComponentProps,
 } from '@scalprum/react-core';
-import axios from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GeneratePayload } from '../common/types';
@@ -24,49 +24,18 @@ const config: AppsConfig = {
   },
 };
 
-type Service = {
-  host: string;
-};
+type CreateAxiosRequest = (config: AxiosRequestConfig) => Promise<unknown>;
 
-type FetchConfig = {
-  service: object;
-  pathname: string;
-};
-
-type ResponseProcessor = (response: unknown) => any;
-
-type FetchDataReturn = {
-  request: FetchConfig | FetchConfig[];
-  responseProcessor: ResponseProcessor;
-};
-
-type FetchData = (services: { [key: string]: Service }) => FetchDataReturn;
-
-async function getTemplateData(
-  configs: FetchConfig[],
-  responseProcessor: ResponseProcessor
-) {
-  const tasks = configs.map(async (config) => {
-    return axios.get(config.pathname).then(({ data }) => data);
-  });
-  const results = await Promise.all(tasks);
-  return responseProcessor(results);
+function createAxiosRequest(config: AxiosRequestConfig) {
+  return axios(config).then((response: AxiosResponse) => response.data);
 }
 
-// clowder should populate this
-const servicesMock: { [key: string]: Service } = {
-  foo: {
-    host: 'bar',
-  },
-  'chrome-service': {
-    host: 'chrome-service',
-  },
-};
+type FetchData = (createAsyncRequest: CreateAxiosRequest) => Promise<unknown>;
 
 type AsyncState = {
   loading: boolean;
   error: unknown;
-  data: any;
+  data: unknown;
 };
 
 const MetadataWrapper = () => {
@@ -86,11 +55,7 @@ const MetadataWrapper = () => {
         setAsyncState({ loading: false, error: null, data: null });
         return;
       }
-      const { request, responseProcessor } = fn(servicesMock);
-      const configs: FetchConfig[] = Array.isArray(request)
-        ? request
-        : [request];
-      const data = await getTemplateData(configs, responseProcessor);
+      const data = await fn(createAxiosRequest);
 
       setAsyncState({ loading: false, error: null, data });
     } catch (error) {
@@ -117,6 +82,9 @@ const App = () => {
     <ScalprumProvider pluginSDKOptions={{}} config={config}>
       <div>
         <h1>Hello World</h1>
+      </div>
+      <div>
+        <pre>{JSON.stringify(window.__initialState__, null, 2)}</pre>
       </div>
       <MetadataWrapper />
     </ScalprumProvider>

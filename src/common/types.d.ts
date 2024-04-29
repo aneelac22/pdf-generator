@@ -12,6 +12,7 @@ export type GeneratePayload = {
   module: string;
   importName?: string;
   fetchDataParams?: Record<string, unknown>;
+  identity: string;
 };
 
 export type PreviewHandlerRequest = Request<

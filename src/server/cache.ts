@@ -36,7 +36,9 @@ export class ReportCache {
         .digest('hex');
     } catch (error) {
       throw new Error(
-        `Unable to create cache key for ${cacheKeyObject}! ${error}`
+        `Unable to create cache key for ${JSON.stringify(
+          cacheKeyObject
+        )}! ${error}`
       );
     }
   }

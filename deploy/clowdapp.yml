@@ -16,11 +16,6 @@ objects:
     - replicas: 1
       partitions: 1
       topicName: pdf-generator.updated.report
-    optionalDependencies:
-    - advisor-backend
-    - compliance
-    - ros-backend
-    - vulnerability-engine
     deployments:
     - name: api
       minReplicas: ${{MIN_REPLICAS}}

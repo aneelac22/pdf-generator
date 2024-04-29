@@ -54,6 +54,7 @@ function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
   }
   return {
     ...payload,
+    identity: httpContext.get(config?.IDENTITY_HEADER_KEY) as string,
     uuid,
     url: requestURL.toString(),
   };
@@ -361,6 +362,10 @@ router.get(`/preview`, async (req: PreviewHandlerRequest, res) => {
   pdfUrl.searchParams.append('manifestLocation', req.query.manifestLocation);
   pdfUrl.searchParams.append('scope', req.query.scope);
   pdfUrl.searchParams.append('module', req.query.module);
+  pdfUrl.searchParams.append(
+    'identity',
+    httpContext.get(config?.IDENTITY_HEADER_KEY) as string
+  );
   if (req.query.importName) {
     pdfUrl.searchParams.append('importName', req.query.importName);
   }
