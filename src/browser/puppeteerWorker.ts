@@ -111,13 +111,6 @@ const generatePdf = async ({
     // Intercept font requests from chrome and send them from dist
     await page.setRequestInterception(true);
     page.on('request', async (request) => {
-      if (request.url().includes('/api/chrome-service/v1/user')) {
-        // apiLogger.debug(`Requesting: `, request.url());
-        apiLogger.debug(
-          `***************************Requesting: `,
-          request.headers()
-        );
-      }
       await redirectFontFiles(request);
     });
 
@@ -151,7 +144,6 @@ const generatePdf = async ({
       throw new Error(`Page render error: ${response}`);
     }
 
-    console.log({ ok: pageStatus?.ok() });
     if (!pageStatus?.ok() && pageStatus?.statusText() !== 'Not Modified') {
       apiLogger.debug(`Page status: ${pageStatus?.statusText()}`);
       throw new Error(
@@ -170,6 +162,10 @@ const generatePdf = async ({
         headerTemplate,
         footerTemplate,
         timeout: BROWSER_TIMEOUT,
+        margin: {
+          top: '54px',
+          bottom: '54px',
+        },
       });
     } catch (error: unknown) {
       throw new Error(`Failed to print pdf: ${JSON.stringify(error)}`);

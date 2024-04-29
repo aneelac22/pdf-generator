@@ -60,6 +60,10 @@ const previewPdf = async (url: string) => {
       displayHeaderFooter: true,
       headerTemplate,
       footerTemplate,
+      margin: {
+        top: '54px',
+        bottom: '54px',
+      },
     });
 
     if (!pageStatus?.ok()) {

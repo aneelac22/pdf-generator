@@ -56,8 +56,14 @@ const serverConfig = {
           loader: 'swc-loader',
           options: {
             jsc: {
+              transform: {
+                react: {
+                  runtime: 'automatic',
+                },
+              },
               parser: {
                 syntax: 'typescript',
+                tsx: true,
               },
             },
           },

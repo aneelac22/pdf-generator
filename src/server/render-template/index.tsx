@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { GeneratePayload } from '../../common/types';
+import { renderToStaticMarkup } from 'react-dom/server';
+import Header from './Header';
+import Footer from './Footer';
 
 export function getHeaderAndFooterTemplates(): {
   headerTemplate: string;
@@ -18,8 +21,14 @@ export function getHeaderAndFooterTemplates(): {
   );
 
   return {
-    headerTemplate: headerBase,
-    footerTemplate: footerBase,
+    headerTemplate: headerBase.replace(
+      '<div id="content"></div>',
+      renderToStaticMarkup(<Header />)
+    ),
+    footerTemplate: footerBase.replace(
+      '<div id="content"></div>',
+      renderToStaticMarkup(<Footer />)
+    ),
   };
 }
 

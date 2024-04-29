@@ -79,15 +79,17 @@ const MetadataWrapper = () => {
 
 const App = () => {
   return (
-    <ScalprumProvider pluginSDKOptions={{}} config={config}>
-      <div>
-        <h1>Hello World</h1>
-      </div>
-      <div>
-        <pre>{JSON.stringify(window.__initialState__, null, 2)}</pre>
-      </div>
-      <MetadataWrapper />
-    </ScalprumProvider>
+    <div>
+      <ScalprumProvider pluginSDKOptions={{}} config={config}>
+        <div>
+          <h1>Hello World</h1>
+        </div>
+        <div>
+          <pre>{JSON.stringify(window.__initialState__, null, 2)}</pre>
+        </div>
+        <MetadataWrapper />
+      </ScalprumProvider>
+    </div>
   );
 };
 
