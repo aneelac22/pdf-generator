@@ -8,7 +8,7 @@ import config from '../common/config';
 import router from './routes/routes';
 import identityMiddleware from '../middleware/identity-middleware';
 import { requestLogger, apiLogger } from '../common/logging';
-import PdfCache from '../browser/helpers';
+import PdfCache from '../common/pdfCache';
 import { consumeMessages } from '../common/kafka';
 import { UPDATE_TOPIC } from '../browser/constants';
 

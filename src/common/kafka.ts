@@ -1,7 +1,7 @@
 import { Kafka, SASLOptions } from 'kafkajs';
 import config from '../common/config';
 import { apiLogger } from './logging';
-import PdfCache from '../browser/helpers';
+import PdfCache from './pdfCache';
 import { KafkaBroker } from 'app-common-js';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -115,9 +115,11 @@ export async function consumeMessages(topic: string) {
         })
       );
       const cacheObject = JSON.parse(message.value?.toString() as string);
-      pdfCache.setItem(cacheObject?.id, {
+      pdfCache.addToCollection(cacheObject?.id, {
         status: cacheObject.status,
         filepath: cacheObject.filepath,
+        collectionId: cacheObject.collectionId,
+        componentId: cacheObject.componentId,
       });
       apiLogger.debug(JSON.stringify(pdfCache));
     },

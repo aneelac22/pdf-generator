@@ -4,11 +4,17 @@ import httpContext from 'express-http-context';
 import getTemplateData from '../data-access';
 import ServiceNames from '../../common/service-names';
 import renderTemplate from '../render-template';
-import PdfCache, {
+import {
   processOrientationOption,
-  sanitizeInput,
+  sanitizeFilepath,
+  sanitizeTemplateConfig,
 } from '../../browser/helpers';
-import { SendingFailedError, PDFNotFoundError } from '../errors';
+import PdfCache from '../../common/pdfCache';
+import {
+  SendingFailedError,
+  PDFNotFoundError,
+  PdfGenerationError,
+} from '../errors';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
 import pool from '../workers';
@@ -24,8 +30,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { ReportCache } from '../cache';
 import { downloadPDF } from '../../common/objectStore';
 import { Readable } from 'stream';
-import { produceMessage } from '../../common/kafka';
-import { UPDATE_TOPIC } from '../../browser/constants';
+import { UpdateStatus, sanitizeRecord } from '../utils';
+import { cluster } from '../cluster';
+import { generatePdf } from '../../browser/clusterTask';
+import { API_CALL_LIMIT } from '../../browser/constants';
+import { isRosSystemsData } from '../data-access/rosDescriptor/rosData';
+
+const CALL_LIMIT = Number(process.env.API_CALL_LIMIT) || API_CALL_LIMIT;
 
 const router = Router();
 const cache = new ReportCache();
@@ -94,9 +105,32 @@ router.use('^/$', async (req: PuppeteerBrowserRequest, res, _next) => {
       configHeaders ? JSON.parse(configHeaders as string) : undefined
     );
 
+    const start = req.headers['start'];
+    const end = req.headers['end'];
+    if (
+      start !== 'undefined' &&
+      end !== 'undefined' &&
+      start !== undefined &&
+      end !== undefined
+    ) {
+      apiLogger.debug(
+        `Processing data range ${req.headers['start']}::${req.headers['end']}`
+      );
+      const clone = JSON.parse(JSON.stringify(templateData));
+      const castData = clone as Record<string, any>;
+      const slicedData = castData.data.data.slice(start, end);
+      castData.data.data = slicedData;
+      const HTMLTemplate: string = renderTemplate(
+        sanitizeTemplateConfig(templateConfig),
+        sanitizeRecord(castData)
+      );
+      res.send(HTMLTemplate);
+      return;
+    }
+
     const HTMLTemplate: string = renderTemplate(
-      templateConfig,
-      templateData as Record<string, unknown>
+      sanitizeTemplateConfig(templateConfig),
+      sanitizeRecord(templateData as Record<string, unknown>)
     );
     res.send(HTMLTemplate);
   } catch (error) {
@@ -113,11 +147,38 @@ router.get(`${config?.APIPrefix}/v1/hello`, (_req, res) => {
   return res.status(200).send('<h1>Well this works!</h1>');
 });
 
+type RenderData = {
+  totalItems: number;
+  calls: number;
+  renderableData: any;
+};
+
+// TODO: This is not and will be fixed when federated magic is applied
+const processTemplateRequest = (templateData: any) => {
+  const renderData: RenderData = <RenderData>{};
+  switch (true) {
+    case isRosSystemsData(templateData.data) == true: {
+      const baseData = templateData.data.data;
+      if (Array.isArray(baseData)) {
+        renderData.totalItems = baseData.length;
+        renderData.calls = Math.ceil(renderData.totalItems / CALL_LIMIT);
+        renderData.renderableData = baseData;
+      }
+      return renderData;
+    }
+    default:
+      apiLogger.debug('no matching data for template');
+      break;
+  }
+};
+
 router.post(
   `${config?.APIPrefix}/v2/create`,
   async (req: GenerateHandlerRequest, res, next) => {
+    // need to support multiple IDs in a group
+    // and await the results to combine
     const pdfDetails = getPdfRequestBody(req);
-    const pdfID = pdfDetails.uuid;
+    const collectionId = pdfDetails.uuid;
     if (!isValidPdfRequest(pdfDetails)) {
       const errStr = 'Failed: service and template options must not be empty';
       apiLogger.debug(errStr);
@@ -129,77 +190,96 @@ router.post(
         },
       });
     }
-    pdfDetails.uuid = pdfID;
-    apiLogger.debug(pool.stats());
+    const configHeaders: string | string[] | undefined =
+      req.headers[config?.OPTIONS_HEADER_NAME];
+    if (configHeaders) {
+      delete req.headers[config?.OPTIONS_HEADER_NAME];
+    }
+
+    const templateRequest = await getTemplateData(
+      req.headers,
+      pdfDetails.templateConfig,
+      configHeaders ? JSON.parse(configHeaders as string) : undefined
+    );
+    const renderData = processTemplateRequest(templateRequest);
 
     try {
-      pool
-        .exec<(...args: unknown[]) => string>('generatePdf', [pdfDetails])
-        .catch((error: unknown) => {
-          apiLogger.error(`${error}`);
-        });
-      const updateMessage = { status: 'Generating', filepath: '' };
-      produceMessage(UPDATE_TOPIC, updateMessage)
-        .then(() => {
-          apiLogger.debug('Generating message sent');
-        })
-        .catch((error: unknown) => {
-          apiLogger.error(`Kafka message not sent: ${error}`);
-        });
-      pdfCache.setItem(pdfID, updateMessage);
+      const requiredCalls = renderData?.calls;
+      if (requiredCalls === 1) {
+        const id = `${uuidv4()}`;
+        apiLogger.debug(`Single call to generator queued for ${collectionId}`);
+        await generatePdf(pdfDetails, {}, id);
+        const updateMessage = {
+          status: 'Generating',
+          filepath: '',
+          componentId: id,
+          collectionId: collectionId,
+        };
+        UpdateStatus(updateMessage);
+        return res.status(202).send({ statusID: collectionId });
+      }
+      // add these in a loop
+      apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
+      for (let x = 0; x < Number(requiredCalls); x++) {
+        const segmentStart = x * CALL_LIMIT;
+        const segmentEnd = segmentStart + CALL_LIMIT - 1;
+        const dataRange = { start: segmentStart, end: segmentEnd };
 
-      return res.status(202).send({ statusID: pdfID });
+        const id = `${uuidv4()}`;
+        await generatePdf(pdfDetails, dataRange, id);
+        const updateMessage = {
+          status: 'Generating',
+          filepath: '',
+          componentId: id,
+          collectionId: collectionId,
+        };
+        UpdateStatus(updateMessage);
+      }
+
+      return res.status(202).send({ statusID: collectionId });
     } catch (error: unknown) {
-      const errStr = `${error}`;
-      if (errStr.includes('No API descriptor')) {
-        const updateMessage = { status: `Failed: ${errStr}`, filepath: '' };
-        apiLogger.error(`Error: ${error}`);
-        produceMessage(UPDATE_TOPIC, updateMessage)
-          .then(() => {
-            apiLogger.debug('Generating error sent');
-          })
-          .catch((error: unknown) => {
-            apiLogger.error(`Kafka message not sent: ${error}`);
+      if (error instanceof PdfGenerationError) {
+        if (error.message.includes('No API descriptor')) {
+          const updateMessage = {
+            status: `Failed: ${error.message}`,
+            filepath: '',
+            collectionId: error.collectionId,
+            componentId: error.componentId,
+          };
+          apiLogger.error(`Error: ${error}`);
+          UpdateStatus(updateMessage);
+          res.status(400).send({
+            error: {
+              status: 400,
+              statusText: 'Bad Request',
+              description: `${error}`,
+            },
           });
-        pdfCache.setItem(pdfID, updateMessage);
-        res.status(400).send({
-          error: {
-            status: 400,
-            statusText: 'Bad Request',
-            description: `${error}`,
-          },
-        });
-      } else {
-        apiLogger.error(`Internal Server error: ${error}`);
-        const updateMessage = { status: `Failed: ${error}`, filepath: '' };
-        produceMessage(UPDATE_TOPIC, updateMessage)
-          .then(() => {
-            apiLogger.debug('Generating error sent');
-          })
-          .catch((error: unknown) => {
-            apiLogger.error(`Kafka message not sent: ${error}`);
+        } else {
+          apiLogger.error(`Internal Server error: ${error}`);
+          const updateMessage = {
+            status: `Failed: ${error}`,
+            filepath: '',
+            collectionId: error.collectionId,
+            componentId: error.componentId,
+          };
+          UpdateStatus(updateMessage);
+          res.status(500).send({
+            error: {
+              status: 500,
+              statusText: 'Internal server error',
+              description: `${error}`,
+            },
           });
-        pdfCache.setItem(pdfID, updateMessage);
-        res.status(500).send({
-          error: {
-            status: 500,
-            statusText: 'Internal server error',
-            description: `${error}`,
-          },
-        });
+        }
       }
       next();
     } finally {
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
-      const stats = pool.stats();
-      apiLogger.debug(JSON.stringify(stats, null, 2));
-      if (
-        stats.pendingTasks === 0 &&
-        stats.totalWorkers === stats.idleWorkers
-      ) {
-        await pool.terminate();
-      }
+      await cluster.idle();
+      apiLogger.debug('task finished');
+      await cluster.close();
     }
   }
 );
@@ -207,7 +287,7 @@ router.post(
 router.get(`${config?.APIPrefix}/v2/status/:statusID`, (req: Request, res) => {
   const ID = req.params.statusID;
   try {
-    const status = pdfCache.getItem(ID);
+    const status = pdfCache.getCollection(ID);
     apiLogger.debug(JSON.stringify(status));
     if (!status) {
       res.status(404).send({
@@ -273,6 +353,7 @@ router.post(
     const pdfDetails = getPdfRequestBody(req);
     const { rhIdentity: _, ...noIdentityHeader } = pdfDetails;
     const accountID = httpContext.get(config?.ACCOUNT_ID);
+    const ID = pdfDetails.uuid;
     const cacheKey = cache.createCacheKey({
       request: noIdentityHeader,
       accountID: accountID,
@@ -280,10 +361,10 @@ router.post(
     apiLogger.debug(`Hashed key ${cacheKey} with Account ID ${accountID}`);
 
     // Check for a cached version of the pdf
-    const filePath = cache.fetch(sanitizeInput(cacheKey));
+    const filePath = cache.fetch(sanitizeFilepath(cacheKey));
     if (filePath) {
       apiLogger.info(`No new generation needed ${filePath} found in cache.`);
-      return res.status(200).sendFile(sanitizeInput(filePath), (err) => {
+      return res.status(200).sendFile(sanitizeFilepath(filePath), (err) => {
         if (err) {
           const errorMessage = new SendingFailedError(filePath, err);
           res.status(500).send({
@@ -311,7 +392,11 @@ router.post(
         throw new PDFNotFoundError(pdfFileName as string);
       }
       cache.fill(cacheKey, pathToPdf);
-      return res.status(200).sendFile(sanitizeInput(pathToPdf), (err) => {
+      res.setHeader('Content-Disposition', `inline; filename="${ID}.pdf"`);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Deprecated', 'True');
+      const sanitizedPath = sanitizeFilepath(pathToPdf);
+      return res.status(200).sendFile(sanitizedPath, (err) => {
         if (err) {
           const errorMessage = new SendingFailedError(
             pdfFileName as string,

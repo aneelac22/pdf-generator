@@ -38,7 +38,7 @@ export type HelloHandlerRequest = Request<
 export type PuppeteerBrowserRequest = Request<
   unknown,
   unknown,
-  unknown,
+  { data: any },
   { service: ServiceNames; template: string }
 >;
 

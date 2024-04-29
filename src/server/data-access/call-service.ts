@@ -35,7 +35,6 @@ const getServiceEndpointMap = (
     [ServiceNames.vulnerability]: ServiceNames.vulnerability,
     [ServiceNames.demo]: ServiceNames.demo,
     [ServiceNames.ros]: 'ros-backend',
-    [ServiceNames.vulnerability]: 'vulnerability-engine-manager-service',
   };
   return services[service] as unknown as keyof ServicesEndpoints;
 };

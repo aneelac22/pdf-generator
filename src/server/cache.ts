@@ -1,5 +1,5 @@
 import fse from 'fs-extra';
-import { sanitizeInput } from '../browser/helpers';
+import { sanitizeFilepath } from '../browser/helpers';
 import { CacheKey } from '../common/types';
 import crypto from 'crypto';
 import { apiLogger } from '../common/logging';
@@ -48,7 +48,7 @@ export class ReportCache {
     setTimeout(() => {
       apiLogger.debug('Calling clean stale cache for: ', fileName);
       delete this.cache[hash];
-      fse.unlink(sanitizeInput(fileName), (err) => {
+      fse.unlink(sanitizeFilepath(fileName), (err) => {
         if (err) {
           apiLogger.warning(`Failed to unlink ${fileName}: ${err}`);
         }
@@ -73,7 +73,7 @@ export class ReportCache {
     }
     if (entry.expiration < Date.now()) {
       delete this.cache[hash];
-      fse.unlink(sanitizeInput(fileName), (err) => {
+      fse.unlink(sanitizeFilepath(fileName), (err) => {
         if (err) {
           apiLogger.warning(`Failed to unlink ${fileName}: ${err}`);
         }
