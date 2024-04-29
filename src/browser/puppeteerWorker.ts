@@ -1,6 +1,5 @@
 import WP from 'workerpool';
-import puppeteer from 'puppeteer';
-import { HTTPRequest } from 'puppeteer';
+import puppeteer, { HTTPRequest } from 'puppeteer';
 import { v4 as uuidv4 } from 'uuid';
 import os from 'os';
 import fs from 'fs';
@@ -8,7 +7,6 @@ import { PdfRequestBody } from '../common/types';
 import { apiLogger } from '../common/logging';
 import {
   CHROMIUM_PATH,
-  getViewportConfig,
   pageHeight,
   pageWidth,
   setWindowProperty,
@@ -27,7 +25,7 @@ const redirectFontFiles = async (request: HTTPRequest) => {
       if (err) {
         await request.respond({
           status: 404,
-          body: `An error occurred while loading font ${modifiedUrl} : ${err}`,
+          body: `An error occurred while loading font ${modifiedUrl} : ${err.message}`,
         });
       }
       await request.respond({
@@ -48,8 +46,6 @@ const getNewPdfName = () => {
 const generatePdf = async ({
   url,
   rhIdentity,
-  templateConfig,
-  orientationOption,
   dataOptions,
   uuid,
 }: PdfRequestBody) => {
@@ -134,6 +130,7 @@ const generatePdf = async ({
 
     // error happened during page rendering
     if (error && error.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let response: any;
       try {
         // error should be JSON
@@ -152,24 +149,17 @@ const generatePdf = async ({
         `Puppeteer error while loading the react app: ${pageStatus?.statusText()}`
       );
     }
-    const { browserMargins, landscape } = getViewportConfig(
-      templateConfig,
-      orientationOption
-    );
 
-    const { headerTemplate, footerTemplate } =
-      getHeaderAndFooterTemplates(templateConfig);
+    const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     try {
       await page.pdf({
         path: pdfPath,
         format: 'a4',
         printBackground: true,
-        margin: browserMargins,
         displayHeaderFooter: true,
         headerTemplate,
         footerTemplate,
-        landscape,
         timeout: BROWSER_TIMEOUT,
       });
     } catch (error: unknown) {

@@ -1,10 +1,8 @@
 import { Request } from 'express';
-import { Page } from 'puppeteer';
+import type { Page } from 'puppeteer';
 import { glob } from 'glob';
 import { PreviewReqBody, PreviewReqQuery } from '../common/types';
 import config from '../common/config';
-import ServiceNames from '../common/service-names';
-import templates from '../templates';
 
 export const SANITIZE_FILEPATH = /^(\.\.(\/|\\|$))+/;
 export const SANITIZE_REGEX =
@@ -97,36 +95,44 @@ export const setWindowProperty = (page: Page, name: string, value: string) =>
     })
   `);
 
-const getBrowserMargins = (service: ServiceNames, template: string) => {
-  return {
-    ...margins,
-    ...templates?.[service]?.[template]?.browserMargins,
+type PdfStatus = {
+  [statusID: string]: {
+    status: string;
+    filepath: string;
   };
 };
 
-const isLandscape = (
-  service: ServiceNames,
-  template: string,
-  orientation?: boolean
-) => {
-  return typeof orientation !== 'undefined'
-    ? orientation
-    : templates?.[service]?.[template]?.landscape;
+type PdfEntry = {
+  status: string;
+  filepath: string;
 };
 
-export const getViewportConfig = (
-  templateConfig: { service: ServiceNames; template: string },
-  orientation?: boolean
-) => {
-  return {
-    browserMargins: getBrowserMargins(
-      templateConfig.service,
-      templateConfig.service
-    ),
-    landscape: isLandscape(
-      templateConfig.service,
-      templateConfig.template,
-      orientation
-    ),
-  };
-};
+class PdfCache {
+  private static instance: PdfCache;
+  private data: PdfStatus;
+
+  private constructor() {
+    this.data = {};
+  }
+
+  public static getInstance(): PdfCache {
+    if (!PdfCache.instance) {
+      PdfCache.instance = new PdfCache();
+    }
+    return PdfCache.instance;
+  }
+
+  public setItem(id: string, status: PdfEntry): void {
+    this.data[id] = { ...status };
+  }
+
+  public getItem(id: string): PdfEntry {
+    return this.data[id];
+  }
+
+  public deleteItem(id: string) {
+    delete this.data[id];
+  }
+}
+
+export default PdfCache;
