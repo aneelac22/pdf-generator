@@ -8,11 +8,19 @@ import ScalprumProvider, {
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { GeneratePayload } from '../common/types';
 
+declare global {
+  interface Window {
+    __initialState__: GeneratePayload;
+  }
+}
+
+const state = window.__initialState__;
 const config: AppsConfig = {
-  landing: {
-    name: 'landing',
-    manifestLocation: '/apps/landing/fed-mods.json',
+  [state.scope]: {
+    name: state.scope,
+    manifestLocation: state.manifestLocation,
   },
 };
 
@@ -38,7 +46,6 @@ async function getTemplateData(
   configs: FetchConfig[],
   responseProcessor: ResponseProcessor
 ) {
-  console.log({ configs });
   const tasks = configs.map(async (config) => {
     return axios.get(config.pathname).then(({ data }) => data);
   });
@@ -71,8 +78,8 @@ const MetadataWrapper = () => {
   async function getFetchMetadata() {
     try {
       const fn = await getModule<FetchData | undefined>(
-        'landing',
-        './EdgeWidget',
+        state.scope,
+        state.module,
         'fetchData'
       );
       if (!fn) {
@@ -98,8 +105,9 @@ const MetadataWrapper = () => {
     { asyncData: AsyncState }
   > = {
     asyncData: asyncState,
-    scope: 'landing',
-    module: './EdgeWidget',
+    scope: state.scope,
+    module: state.module,
+    importName: state.importName,
   };
   return <ScalprumComponent {...props} />;
 };

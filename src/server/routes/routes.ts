@@ -1,27 +1,24 @@
 import fs from 'fs';
-import { Router } from 'express';
 import crypto from 'crypto';
-import httpContext from 'express-http-context';
-import renderTemplate from '../render-template';
-import {
-  processOrientationOption,
-  sanitizeFilepath,
-} from '../../browser/helpers';
+import { sanitizeFilepath } from '../../browser/helpers';
 import PdfCache from '../../common/pdfCache';
 import {
   SendingFailedError,
   PDFNotFoundError,
   PdfGenerationError,
 } from '../errors';
+import { Router, Request } from 'express';
+import httpContext from 'express-http-context';
+import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
 import pool from '../workers';
-import { Request } from 'express';
 import {
   GenerateHandlerRequest,
   PdfRequestBody,
   PuppeteerBrowserRequest,
   PreviewHandlerRequest,
+  GeneratePayload,
 } from '../../common/types';
 import { apiLogger } from '../../common/logging';
 import { ReportCache } from '../cache';
@@ -38,34 +35,37 @@ const router = Router();
 const cache = new ReportCache();
 const pdfCache = PdfCache.getInstance();
 
-function getPdfRequestBody(req: GenerateHandlerRequest): PdfRequestBody {
-  const rhIdentity = httpContext.get(config?.IDENTITY_HEADER_KEY);
-  const orientationOption = processOrientationOption(req);
-  const service = req.body.service;
-  const template = req.body.template;
-  const dataOptions = req.body;
+function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
+  const { manifestLocation, module, scope, fetchDataParams, importName } =
+    payload;
   const uuid = crypto.randomUUID();
-  const url = `http://localhost:${config?.webPort}?template=${template}&service=${service}`;
+  const requestURL = new URL(`http://localhost:${config?.webPort}/puppeteer`);
+  requestURL.searchParams.append('manifestLocation', manifestLocation);
+  requestURL.searchParams.append('scope', scope);
+  requestURL.searchParams.append('module', module);
+  if (importName) {
+    requestURL.searchParams.append('importName', importName);
+  }
+  if (fetchDataParams) {
+    requestURL.searchParams.append(
+      'fetchDataParams',
+      JSON.stringify(fetchDataParams)
+    );
+  }
   return {
-    url,
-    rhIdentity,
-    templateConfig: {
-      service,
-      template,
-    },
-    orientationOption,
-    dataOptions,
+    ...payload,
     uuid,
+    url: requestURL.toString(),
   };
 }
 
 // Middleware that activates on all routes, responsible for rendering the correct
 // template/component into html to the requester.
-router.use('^/$', (req: PuppeteerBrowserRequest, res, _next) => {
-  let template: string = req.query.template;
-  if (!template) {
+router.get('/puppeteer', (req: PuppeteerBrowserRequest, res, _next) => {
+  const payload = req.query;
+  if (!payload) {
     apiLogger.warning('Missing template, using "demo"');
-    template = 'demo';
+    throw new Error('Missing template metadata!');
   }
   try {
     const configHeaders: string | string[] | undefined =
@@ -73,7 +73,8 @@ router.use('^/$', (req: PuppeteerBrowserRequest, res, _next) => {
     if (configHeaders) {
       delete req.headers[config?.OPTIONS_HEADER_NAME];
     }
-    const HTMLTemplate: string = renderTemplate();
+
+    const HTMLTemplate: string = renderTemplate(payload);
     res.send(HTMLTemplate);
   } catch (error) {
     // render error to DOM to retrieve the error content from puppeteer
@@ -92,9 +93,12 @@ router.get(`${config?.APIPrefix}/v1/hello`, (_req, res) => {
 router.post(
   `${config?.APIPrefix}/v2/create`,
   async (req: GenerateHandlerRequest, res, next) => {
+    const requestConfig = Array.isArray(req.body.payload)
+      ? req.body.payload[0]
+      : req.body.payload;
     // need to support multiple IDs in a group
     // and await the results to combine
-    const pdfDetails = getPdfRequestBody(req);
+    const pdfDetails = getPdfRequestBody(requestConfig);
     const collectionId = pdfDetails.uuid;
     const configHeaders: string | string[] | undefined =
       req.headers[config?.OPTIONS_HEADER_NAME];
@@ -250,12 +254,15 @@ router.get(
 router.post(
   `${config?.APIPrefix}/v1/generate`,
   async (req: GenerateHandlerRequest, res, next) => {
-    const pdfDetails = getPdfRequestBody(req);
-    const { rhIdentity: _, ...noIdentityHeader } = pdfDetails;
+    // for testing purposes
+    const requestConfig = Array.isArray(req.body.payload)
+      ? req.body.payload[0]
+      : req.body.payload;
+    const pdfDetails = getPdfRequestBody(requestConfig);
     const accountID = httpContext.get(config?.ACCOUNT_ID);
     const ID = pdfDetails.uuid;
     const cacheKey = cache.createCacheKey({
-      request: noIdentityHeader,
+      request: pdfDetails,
       accountID: accountID,
     });
     apiLogger.debug(`Hashed key ${cacheKey} with Account ID ${accountID}`);
@@ -350,11 +357,22 @@ router.post(
 );
 
 router.get(`/preview`, async (req: PreviewHandlerRequest, res) => {
-  const template: string = req.query.template;
-  const url = `http://localhost:${config?.webPort}?&template=${template}`;
+  const pdfUrl = new URL(`http://localhost:${config?.webPort}/puppeteer`);
+  pdfUrl.searchParams.append('manifestLocation', req.query.manifestLocation);
+  pdfUrl.searchParams.append('scope', req.query.scope);
+  pdfUrl.searchParams.append('module', req.query.module);
+  if (req.query.importName) {
+    pdfUrl.searchParams.append('importName', req.query.importName);
+  }
+  if (req.query.fetchDataParams) {
+    pdfUrl.searchParams.append(
+      'fetchDataParams',
+      JSON.stringify(req.query.fetchDataParams)
+    );
+  }
 
   try {
-    const pdfBuffer = await previewPdf(url);
+    const pdfBuffer = await previewPdf(pdfUrl.toString());
     res.set('Content-Type', 'application/pdf');
     res.status(200).send(pdfBuffer);
   } catch (error: unknown) {

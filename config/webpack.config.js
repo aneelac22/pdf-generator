@@ -119,6 +119,7 @@ const clientConfig = {
     moduleFederationPlugin,
     new HtmlWebpackPlugin({
       template: path.resolve(__dirname, '../src/client/index.html'),
+      publicPath: '/public/',
     }),
     new MiniCssExtractPlugin(),
   ],

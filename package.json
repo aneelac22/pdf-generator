@@ -27,6 +27,7 @@
     "express-winston": "^4.2.0",
     "fs-extra": "^11.2.0",
     "glob": "^10.3.12",
+    "http-proxy-middleware": "^3.0.0",
     "ignore-styles": "^5.0.1",
     "kafkajs": "^2.2.4",
     "prom-client": "^15.1.2",

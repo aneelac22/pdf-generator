@@ -1,7 +1,6 @@
-import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { renderToString } from 'react-dom/server';
+import { GeneratePayload } from '../../common/types';
 
 export function getHeaderAndFooterTemplates(): {
   headerTemplate: string;
@@ -24,17 +23,22 @@ export function getHeaderAndFooterTemplates(): {
   };
 }
 
-function renderTemplate() {
+function renderTemplate(payload: GeneratePayload) {
   const root = process.cwd();
   const baseTemplate = fs.readFileSync(
-    path.resolve(root, 'public/templates/base-template.html'),
+    path.resolve(root, 'dist/public/index.html'),
     { encoding: 'utf-8' }
   );
 
   const template = baseTemplate.replace(
-    '<div id="root"></div>',
-    `<div id="root">${renderToString(<></>)}</div>`
+    '<script id="initial-state"></script>',
+    `<script id="initial-state">window.__initialState__ = ${JSON.stringify(
+      payload,
+      null,
+      2
+    )}</script>`
   );
+
   return template;
 }
 

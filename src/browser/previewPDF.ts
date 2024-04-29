@@ -6,10 +6,14 @@ import {
   setWindowProperty,
 } from './helpers';
 import config from '../common/config';
-import renderTemplate, {
-  getHeaderAndFooterTemplates,
-} from '../server/render-template';
+import { getHeaderAndFooterTemplates } from '../server/render-template';
 import { apiLogger } from '../common/logging';
+
+function delay(time: number) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, time);
+  });
+}
 
 const previewPdf = async (url: string) => {
   const createBuffer = async () => {
@@ -24,13 +28,19 @@ const previewPdf = async (url: string) => {
       args: ['--no-sandbox', '--disable-gpu'],
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: pageWidth, height: pageHeight });
-    await page.setContent(renderTemplate());
 
-    // // Enables console logging in Headless mode - handy for debugging components
+    // Enables console logging in Headless mode - handy for debugging components
     page.on('console', (msg) =>
       apiLogger.debug(`[Headless log] ${msg.text()}`)
     );
+    await page.setViewport({ width: pageWidth, height: pageHeight });
+
+    const pageStatus = await page.goto(url, {
+      waitUntil: 'networkidle2',
+    });
+
+    await delay(1000);
+    await page.waitForNetworkIdle();
     const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     await setWindowProperty(
@@ -43,8 +53,6 @@ const previewPdf = async (url: string) => {
         },
       })
     );
-
-    const pageStatus = await page.goto(url, { waitUntil: 'networkidle2' });
 
     const pdfBuffer = await page.pdf({
       format: 'a4',

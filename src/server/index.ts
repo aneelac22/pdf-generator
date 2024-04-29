@@ -4,6 +4,7 @@ import cors from 'cors';
 import promBundle from 'express-prom-bundle';
 import httpContext from 'express-http-context';
 import http from 'http';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import config from '../common/config';
 import router from './routes/routes';
 import identityMiddleware from '../middleware/identity-middleware';
@@ -14,6 +15,16 @@ import { UPDATE_TOPIC } from '../browser/constants';
 
 const PORT = config?.webPort;
 
+const assetsProxy = createProxyMiddleware({
+  target: 'http://localhost:8003',
+  changeOrigin: true,
+  pathFilter: (path) => path.startsWith('/apps') || path.startsWith('/api'),
+  router: {
+    '/apps/landing': 'http://localhost:8003',
+    '/api': 'https://console.stage.redhat.com/',
+  },
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -22,7 +33,9 @@ app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(httpContext.middleware);
 app.use(identityMiddleware);
 app.use(requestLogger);
+router.use('/public', express.static(path.resolve(__dirname, './public')));
 app.use('/', router);
+app.use(assetsProxy);
 
 PdfCache.getInstance();
 
