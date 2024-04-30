@@ -13,6 +13,7 @@ import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
 import pool from '../workers';
+import crypto from 'crypto';
 import {
   GenerateHandlerRequest,
   PdfRequestBody,
