@@ -13,7 +13,6 @@ import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
 import pool from '../workers';
-import crypto from 'crypto';
 import {
   GenerateHandlerRequest,
   PdfRequestBody,
@@ -29,12 +28,56 @@ import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
 import { API_CALL_LIMIT } from '../../browser/constants';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const CALL_LIMIT = Number(process.env.API_CALL_LIMIT) || API_CALL_LIMIT;
 
 const router = Router();
 const cache = new ReportCache();
 const pdfCache = PdfCache.getInstance();
+
+let hasProxy = false;
+
+function addProxy(req: GenerateHandlerRequest) {
+  if (!hasProxy) {
+    if (config.scalprum.apiHost === 'blank') {
+      const apiHost = 'https' + '://' + req.get('host');
+      config.scalprum.apiHost = apiHost;
+      apiLogger.debug(
+        `The variable apiHost is not in config! Falling back to request origin host: ${apiHost}`
+      );
+    }
+    if (config.scalprum.assetsHost === 'blank') {
+      const assetsHost = 'https' + '://' + req.get('host');
+      config.scalprum.assetsHost = assetsHost;
+      apiLogger.debug(
+        `The variable assetsHost is not in config! Falling back to request origin host: ${assetsHost}`
+      );
+    }
+    const assetsProxy = createProxyMiddleware({
+      target: config.scalprum.assetsHost,
+      changeOrigin: true,
+      pathFilter: (path) => path.startsWith('/apps'),
+      logger: apiLogger,
+    });
+    const apiProxy = createProxyMiddleware({
+      target: config.scalprum.apiHost,
+      changeOrigin: true,
+      pathFilter: (path) =>
+        path.startsWith('/api') && !path.includes('crc-pdf-generator'),
+      preserveHeaderKeyCase: true,
+      on: {
+        proxyReq: (req) => {
+          console.log(req.getHeaders());
+        },
+      },
+      logger: apiLogger,
+    });
+    router.use(assetsProxy);
+    router.use(apiProxy);
+    hasProxy = true;
+  }
+}
 
 function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
   const { manifestLocation, module, scope, fetchDataParams, importName } =
@@ -64,6 +107,7 @@ function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
 // Middleware that activates on all routes, responsible for rendering the correct
 // template/component into html to the requester.
 router.get('/puppeteer', (req: PuppeteerBrowserRequest, res, _next) => {
+  addProxy(req);
   const payload = req.query;
   if (!payload) {
     apiLogger.warning('Missing template, using "demo"');
@@ -95,6 +139,8 @@ router.get(`${config?.APIPrefix}/v1/hello`, (_req, res) => {
 router.post(
   `${config?.APIPrefix}/v2/create`,
   async (req: GenerateHandlerRequest, res, next) => {
+    addProxy(req);
+    // for testing purposes
     const requestConfig = Array.isArray(req.body.payload)
       ? req.body.payload[0]
       : req.body.payload;
@@ -107,6 +153,7 @@ router.post(
     if (configHeaders) {
       delete req.headers[config?.OPTIONS_HEADER_NAME];
     }
+    console.log(req.header('Authorization'));
 
     try {
       // TODO: Based on payload length
@@ -196,7 +243,7 @@ router.get(`${config?.APIPrefix}/v2/status/:statusID`, (req: Request, res) => {
     const status = pdfCache.getCollection(ID);
     apiLogger.debug(JSON.stringify(status));
     if (!status) {
-      res.status(404).send({
+      return res.status(404).send({
         error: {
           status: 404,
           statusText: 'PDF status could not be determined; Please check the ID',
@@ -207,7 +254,7 @@ router.get(`${config?.APIPrefix}/v2/status/:statusID`, (req: Request, res) => {
 
     return res.status(200).send({ status });
   } catch (error) {
-    res.status(400).send({
+    return res.status(400).send({
       error: {
         status: 400,
         statusText: 'PDF status could not be determined',
@@ -256,6 +303,7 @@ router.get(
 router.post(
   `${config?.APIPrefix}/v1/generate`,
   async (req: GenerateHandlerRequest, res, next) => {
+    addProxy(req);
     // for testing purposes
     const requestConfig = Array.isArray(req.body.payload)
       ? req.body.payload[0]
@@ -267,6 +315,10 @@ router.post(
       request: pdfDetails,
       accountID: accountID,
     });
+    console.log('***************************888');
+    apiLogger.debug(
+      `Request host: ', ${req.protocol} ${req.get('host')}, ${req.url}`
+    );
     apiLogger.debug(`Hashed key ${cacheKey} with Account ID ${accountID}`);
 
     // Check for a cached version of the pdf
@@ -359,6 +411,7 @@ router.post(
 );
 
 router.get(`/preview`, async (req: PreviewHandlerRequest, res) => {
+  addProxy(req as any);
   const pdfUrl = new URL(`http://localhost:${config?.webPort}/puppeteer`);
   pdfUrl.searchParams.append('manifestLocation', req.query.manifestLocation);
   pdfUrl.searchParams.append('scope', req.query.scope);

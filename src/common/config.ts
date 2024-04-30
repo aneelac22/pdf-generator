@@ -98,8 +98,8 @@ const defaultConfig: {
   ACCOUNT_ID: '',
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   scalprum: {
-    apiHost: process.env.API_HOST || 'https://console.stage.redhat.com/',
-    assetsHost: process.env.ASSETS_HOST || 'https://console.stage.redhat.com/',
+    apiHost: process.env.API_HOST || 'blank',
+    assetsHost: process.env.ASSETS_HOST || 'blank',
   },
 };
 

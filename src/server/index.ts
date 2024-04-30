@@ -4,7 +4,6 @@ import cors from 'cors';
 import promBundle from 'express-prom-bundle';
 import httpContext from 'express-http-context';
 import http from 'http';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import config from '../common/config';
 import router from './routes/routes';
 import identityMiddleware from '../middleware/identity-middleware';
@@ -14,16 +13,6 @@ import { consumeMessages } from '../common/kafka';
 import { UPDATE_TOPIC } from '../browser/constants';
 
 const PORT = config?.webPort;
-
-const assetsProxy = createProxyMiddleware({
-  target: config.scalprum.apiHost,
-  changeOrigin: true,
-  pathFilter: (path) => path.startsWith('/apps') || path.startsWith('/api'),
-  router: {
-    '/apps': config.scalprum.assetsHost,
-    '/api': config.scalprum.apiHost,
-  },
-});
 
 const app = express();
 app.use(cors());
@@ -35,7 +24,6 @@ app.use(identityMiddleware);
 app.use(requestLogger);
 router.use('/public', express.static(path.resolve(__dirname, './public')));
 app.use('/', router);
-app.use(assetsProxy);
 
 PdfCache.getInstance();
 

@@ -15,7 +15,7 @@ import { getHeaderAndFooterTemplates } from '../server/render-template';
 import config from '../common/config';
 
 // Match the timeout on the gateway
-const BROWSER_TIMEOUT = 60_000;
+const BROWSER_TIMEOUT = 600_000;
 
 const redirectFontFiles = async (request: HTTPRequest) => {
   if (request.url().endsWith('.woff') || request.url().endsWith('.woff2')) {
@@ -43,12 +43,9 @@ const getNewPdfName = () => {
   return `${os.tmpdir()}/${pdfFilename}`;
 };
 
-const generatePdf = async ({
-  url,
-  identity,
-  uuid,
-  fetchDataParams,
-}: PdfRequestBody) => {
+const generatePdf = async (data: PdfRequestBody) => {
+  const { url, identity, uuid, fetchDataParams } = data;
+  console.log('generatePdf', data);
   const pdfPath = getNewPdfName();
   const createFilename = async () => {
     apiLogger.debug(uuid);
@@ -74,7 +71,6 @@ const generatePdf = async ({
         '--user-data-dir=/tmp/',
       ],
     });
-    // }
 
     const page = await browser.newPage();
     await page.setUserAgent(
@@ -97,6 +93,7 @@ const generatePdf = async ({
       })
       // }) as undefined // probably a typings issue in puppeteer
     );
+    console.log('Identity in worker: ', identity);
     await page.setExtraHTTPHeaders({
       ...(fetchDataParams
         ? {
@@ -104,7 +101,7 @@ const generatePdf = async ({
           }
         : {}),
 
-      ...(config?.IS_DEVELOPMENT && !identity
+      ...(config?.IS_DEVELOPMENT || !identity
         ? {}
         : { 'x-rh-identity': identity }),
     });
@@ -145,6 +142,8 @@ const generatePdf = async ({
       throw new Error(`Page render error: ${response}`);
     }
 
+    console.log(pageStatus?.statusText(), pageStatus?.ok());
+
     if (!pageStatus?.ok() && pageStatus?.statusText() !== 'Not Modified') {
       apiLogger.debug(`Page status: ${pageStatus?.statusText()}`);
       throw new Error(
@@ -152,6 +151,7 @@ const generatePdf = async ({
       );
     }
 
+    console.log('pdfPath', pdfPath);
     const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     try {
