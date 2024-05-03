@@ -33,3 +33,20 @@ export class PDFRequestError {
     this.message = `Error fetching data: ${error}`;
   }
 }
+
+export class PdfGenerationError extends Error {
+  collectionId: string;
+  componentId: string;
+
+  constructor(collectionId: string, componentId: string, message: string) {
+    super(message);
+    this.collectionId = collectionId;
+    this.componentId = componentId;
+    this.name = this.constructor.name;
+    if (typeof Error.captureStackTrace === 'function') {
+      Error.captureStackTrace(this, this.constructor); // Capture the stack trace
+    } else {
+      this.stack = new Error(message).stack; // Fallback for non-V8 environments
+    }
+  }
+}

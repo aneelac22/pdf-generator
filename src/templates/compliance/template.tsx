@@ -116,7 +116,7 @@ const ComplianceTemplate = ({
           headingLevel="h1"
           className="pf-u-danger-color-100 pf-u-font-size-lg pf-u-mb-xs pf-u-mt-xl"
         >
-          Non-Reportig Systems:
+          Non-Reporting Systems:
         </Title>
         <UnreportedSystemsTable
           systems={nonReportingSystems}

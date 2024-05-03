@@ -11,11 +11,13 @@ RUN curl -L https://git.io/n-install --output n-install
 RUN chmod +x n-install && yes y | ./n-install
 RUN $HOME/n/bin/n 18
 
+ENV XDG_CONFIG_HOME="/tmp/.chromium"
+ENV XDG_CACHE_HOME="/tmp/.chromium"
+
 # RUN npm install using package-lock.json
 RUN npm ci
 # Install the chromium locally if necessary.
-RUN node node_modules/puppeteer/install.js
-RUN chmod -R o+rwx node_modules/puppeteer/.local-chromium
+RUN node node_modules/puppeteer/install.mjs
 
 # Check for circular dependencies
 RUN node circular.js

@@ -107,3 +107,6 @@ parameters:
 - description: Dynamic name for the s3 bucket based on env
   name: PDF_BUCKET
   value: "crc-generated-pdfs"
+- description: Enable large test queries
+  name: QUERY_LARGE_DATASET
+  value: "false"

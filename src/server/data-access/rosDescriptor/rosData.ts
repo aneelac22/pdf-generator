@@ -344,3 +344,19 @@ export const rosSystemFilters = {
   os: ['9.0', '7.7'],
   group_name: ['team-ros', 'team-ocp'],
 };
+
+export const isRosSystemsData = (obj: any) => {
+  if (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'meta' in obj &&
+    'data' in obj &&
+    typeof obj.meta === 'object' &&
+    typeof obj.data === 'object' &&
+    Array.isArray(obj.data)
+  ) {
+    return true;
+  } else {
+    return false;
+  }
+};

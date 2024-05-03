@@ -4,6 +4,7 @@ import config from '../../../common/config';
 import { rosExecutiveData, rosSystemFilters, rosSystemsData } from './rosData';
 import axios, { AxiosRequestHeaders } from 'axios';
 import QueryString from 'qs';
+import RosBigData from './rosLargeDataSet.json';
 
 const BASE_URL = `http://${config?.endpoints['ros-backend']?.hostname}:${config?.endpoints['ros-backend']?.port}/api/ros/v1`;
 const EXECUTIVE_REPORT_URL = `${BASE_URL}/executive_report`;
@@ -21,7 +22,7 @@ const getExecutiveReport = async (headers: AxiosRequestHeaders) => {
 
 const getSystemsReport = async (
   headers: AxiosRequestHeaders,
-  { params }: Record<string, any>
+  { params }: Record<string, any> = {}
 ) => {
   const defaultParams = {
     order_by: 'report_date',
@@ -45,7 +46,9 @@ const executiveGetMock: ServiceCallFunction = () =>
 const executiveResponseProcessor = (data: typeof rosExecutiveData) => data;
 
 const systemsGetMock: ServiceCallFunction = () =>
-  Promise.resolve({ data: rosSystemsData, filters: rosSystemFilters });
+  process.env.QUERY_LARGE_DATASET === 'true'
+    ? Promise.resolve({ data: RosBigData, filters: rosSystemFilters })
+    : Promise.resolve({ data: rosSystemsData, filters: rosSystemFilters });
 
 const systemsResponseProcessor = (data: typeof rosSystemsData) => data;
 

@@ -22,5 +22,8 @@ public/*
 .DS_Store
 .vscode
 
+# Snyk
+.dccache
+
 # Local minio dir
 start
