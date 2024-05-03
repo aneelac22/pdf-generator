@@ -1,4 +1,3 @@
-import WP from 'workerpool';
 import puppeteer, { HTTPRequest } from 'puppeteer';
 import os from 'os';
 import fs from 'fs';

@@ -1,7 +1,5 @@
-import { Request } from 'express';
 import type { Page } from 'puppeteer';
 import { glob } from 'glob';
-import { PreviewReqBody, PreviewReqQuery } from '../common/types';
 import config from '../common/config';
 
 export const SANITIZE_FILEPATH = /^(\.\.(\/|\\|$))+/;
@@ -16,46 +14,7 @@ export const sanitizeFilepath = (input: string) => {
   return input.replace(SANITIZE_FILEPATH, '');
 };
 
-export const sanitizeHTTP = (input: string) => {
-  return input.replace(SANITIZE_REGEX, '');
-};
-
-export const toServiceName = (input: string) => {
-  const sanitizedInput = sanitizeHTTP(input);
-  return ServiceNames[sanitizedInput as keyof typeof ServiceNames];
-};
-
-export const sanitizeTemplateConfig = (templateConfig: {
-  service: ServiceNames;
-  template: string;
-}): {
-  service: ServiceNames;
-  template: string;
-} => {
-  return {
-    service: toServiceName(templateConfig.service),
-    template: sanitizeHTTP(templateConfig.template),
-  };
-};
-
 export const MaxWorkers = 4;
-
-export const processOrientationOption = (
-  request: Request<unknown, unknown, PreviewReqBody, PreviewReqQuery>
-) => {
-  let orientationOption = '';
-  if (request.query?.orientation) {
-    orientationOption = request.query?.orientation;
-  } else if (request.body?.orientation) {
-    orientationOption = request.body?.orientation;
-  }
-
-  if (orientationOption === 'landscape') {
-    return true;
-  }
-
-  return undefined;
-};
 
 export const margins = {
   top: '2cm',

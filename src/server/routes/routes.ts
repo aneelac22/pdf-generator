@@ -1,18 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'fs';
 import crypto from 'crypto';
-import { sanitizeFilepath } from '../../browser/helpers';
 import PdfCache from '../../common/pdfCache';
-import {
-  SendingFailedError,
-  PDFNotFoundError,
-  PdfGenerationError,
-} from '../errors';
+import { PdfGenerationError } from '../errors';
 import { Router, Request } from 'express';
 import httpContext from 'express-http-context';
 import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
-import pool from '../workers';
 import {
   GenerateHandlerRequest,
   PdfRequestBody,
@@ -21,19 +17,14 @@ import {
   GeneratePayload,
 } from '../../common/types';
 import { apiLogger } from '../../common/logging';
-import { ReportCache } from '../cache';
 import { downloadPDF } from '../../common/objectStore';
 import { Readable } from 'stream';
 import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
-import { API_CALL_LIMIT } from '../../browser/constants';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
-const CALL_LIMIT = Number(process.env.API_CALL_LIMIT) || API_CALL_LIMIT;
-
 const router = Router();
-const cache = new ReportCache();
 const pdfCache = PdfCache.getInstance();
 
 let hasProxy = false;
@@ -107,7 +98,7 @@ function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
 // Middleware that activates on all routes, responsible for rendering the correct
 // template/component into html to the requester.
 router.get('/puppeteer', (req: PuppeteerBrowserRequest, res, _next) => {
-  addProxy(req);
+  addProxy(req as any);
   const payload = req.query;
   if (!payload) {
     apiLogger.warning('Missing template, using "demo"');
@@ -138,52 +129,52 @@ router.get(`${config?.APIPrefix}/v1/hello`, (_req, res) => {
 
 router.post(
   `${config?.APIPrefix}/v2/create`,
-  async (req: GenerateHandlerRequest, res, next) => {
+  async (req: GenerateHandlerRequest, res) => {
     addProxy(req);
+    const collectionId = crypto.randomUUID();
     // for testing purposes
-    const requestConfig = Array.isArray(req.body.payload)
-      ? req.body.payload[0]
-      : req.body.payload;
-    // need to support multiple IDs in a group
-    // and await the results to combine
-    const pdfDetails = getPdfRequestBody(requestConfig);
-    const collectionId = pdfDetails.uuid;
-    const configHeaders: string | string[] | undefined =
-      req.headers[config?.OPTIONS_HEADER_NAME];
-    if (configHeaders) {
-      delete req.headers[config?.OPTIONS_HEADER_NAME];
-    }
-    console.log(req.header('Authorization'));
+    const requestConfigs = Array.isArray(req.body.payload)
+      ? req.body.payload
+      : [req.body.payload];
 
     try {
-      // TODO: Based on payload length
-      const requiredCalls = 1;
+      const requiredCalls = requestConfigs.length;
       if (requiredCalls === 1) {
-        const id = crypto.randomUUID();
+        // need to support multiple IDs in a group
+        // and await the results to combine
+        const pdfDetails = getPdfRequestBody(requestConfigs[0]);
+        const configHeaders: string | string[] | undefined =
+          req.headers[config?.OPTIONS_HEADER_NAME];
+        if (configHeaders) {
+          delete req.headers[config?.OPTIONS_HEADER_NAME];
+        }
+        console.log(req.header('Authorization'));
         apiLogger.debug(`Single call to generator queued for ${collectionId}`);
-        await generatePdf(pdfDetails, {}, id);
+        await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',
           filepath: '',
-          componentId: id,
-          collectionId: collectionId,
+          componentId: pdfDetails.uuid,
+          collectionId,
         };
         UpdateStatus(updateMessage);
         return res.status(202).send({ statusID: collectionId });
       }
       // add these in a loop
-      apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
+      // LOOP based on payload length
       for (let x = 0; x < Number(requiredCalls); x++) {
-        const segmentStart = x * CALL_LIMIT;
-        const segmentEnd = segmentStart + CALL_LIMIT - 1;
-        const dataRange = { start: segmentStart, end: segmentEnd };
-
-        const id = crypto.randomUUID();
-        await generatePdf(pdfDetails, dataRange, id);
+        const pdfDetails = getPdfRequestBody(requestConfigs[x]);
+        const configHeaders: string | string[] | undefined =
+          req.headers[config?.OPTIONS_HEADER_NAME];
+        if (configHeaders) {
+          delete req.headers[config?.OPTIONS_HEADER_NAME];
+        }
+        apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
+        await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',
           filepath: '',
-          componentId: id,
+          componentId: pdfDetails.uuid,
           collectionId: collectionId,
         };
         UpdateStatus(updateMessage);
@@ -226,7 +217,6 @@ router.post(
           });
         }
       }
-      next();
     } finally {
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
@@ -302,111 +292,8 @@ router.get(
 
 router.post(
   `${config?.APIPrefix}/v1/generate`,
-  async (req: GenerateHandlerRequest, res, next) => {
-    addProxy(req);
-    // for testing purposes
-    const requestConfig = Array.isArray(req.body.payload)
-      ? req.body.payload[0]
-      : req.body.payload;
-    const pdfDetails = getPdfRequestBody(requestConfig);
-    const accountID = httpContext.get(config?.ACCOUNT_ID);
-    const ID = pdfDetails.uuid;
-    const cacheKey = cache.createCacheKey({
-      request: pdfDetails,
-      accountID: accountID,
-    });
-    console.log('***************************888');
-    apiLogger.debug(
-      `Request host: ', ${req.protocol} ${req.get('host')}, ${req.url}`
-    );
-    apiLogger.debug(`Hashed key ${cacheKey} with Account ID ${accountID}`);
-
-    // Check for a cached version of the pdf
-    const filePath = cache.fetch(sanitizeFilepath(cacheKey));
-    if (filePath) {
-      apiLogger.info(`No new generation needed ${filePath} found in cache.`);
-      return res.status(200).sendFile(sanitizeFilepath(filePath), (err) => {
-        if (err) {
-          const errorMessage = new SendingFailedError(filePath, err);
-          res.status(500).send({
-            error: {
-              status: 500,
-              statusText: 'PDF was generated, but could not be sent',
-              description: errorMessage.message,
-            },
-          });
-        }
-      });
-    }
-
-    apiLogger.debug(JSON.stringify(pool.stats(), null, 2));
-
-    try {
-      const pathToPdf = await pool.exec<(...args: unknown[]) => string>(
-        'generatePdf',
-        [pdfDetails]
-      );
-
-      const pdfFileName = pathToPdf.split('/').pop();
-
-      if (!fs.existsSync(pathToPdf)) {
-        throw new PDFNotFoundError(pdfFileName as string);
-      }
-      cache.fill(cacheKey, pathToPdf);
-      res.setHeader('Content-Disposition', `inline; filename="${ID}.pdf"`);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Deprecated', 'True');
-      const sanitizedPath = sanitizeFilepath(pathToPdf);
-      return res.status(200).sendFile(sanitizedPath, (err) => {
-        if (err) {
-          const errorMessage = new SendingFailedError(
-            pdfFileName as string,
-            err
-          );
-          res.status(500).send({
-            error: {
-              status: 500,
-              statusText: 'PDF was generated, but could not be sent',
-              description: errorMessage.message,
-            },
-          });
-        }
-        apiLogger.info('Successfully generated report');
-      });
-    } catch (error: unknown) {
-      const errStr = `${error}`;
-      if (errStr.includes('No API descriptor')) {
-        apiLogger.error(`Failed to generate a PDF: ${error}`);
-        res.status(400).send({
-          error: {
-            status: 400,
-            statusText: 'Bad Request',
-            description: `${error}`,
-          },
-        });
-      } else {
-        apiLogger.error(`Internal Server error: ${error}`);
-        res.status(500).send({
-          error: {
-            status: 500,
-            statusText: 'Internal server error',
-            description: `${error}`,
-          },
-        });
-      }
-      next();
-    } finally {
-      // To handle the edge case where a pool terminates while the queue isn't empty,
-      // we ensure that the queue is empty and all workers are idle.
-      const stats = pool.stats();
-      apiLogger.debug(JSON.stringify(stats, null, 2));
-      if (
-        stats.pendingTasks === 0 &&
-        stats.totalWorkers === stats.idleWorkers
-      ) {
-        await pool.terminate();
-      }
-    }
+  async (_req: GenerateHandlerRequest, res) => {
+    res.status(400).send('This endpoint is deprecated. Please use /v2/create');
   }
 );
 

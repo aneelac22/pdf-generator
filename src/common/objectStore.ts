@@ -4,8 +4,11 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from '@aws-sdk/client-s3';
 import { createReadStream } from 'fs-extra';
+import PdfCache from './pdfCache';
 
 export const StorageClient = () => {
   if (config?.objectStore.tls) {
@@ -34,9 +37,43 @@ export const StorageClient = () => {
 
 const s3 = StorageClient();
 
+const checkBucketExists = async (bucket: string) => {
+  const options = {
+    Bucket: bucket,
+  };
+
+  try {
+    await s3.send(new HeadBucketCommand(options));
+    return true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    if (error['$metadata']?.httpStatusCode === 404) {
+      return false;
+    }
+    throw error;
+  }
+};
+
+const createBucket = async (bucket: string) => {
+  const command = new CreateBucketCommand({
+    // The name of the bucket. Bucket names are unique and have several other constraints.
+    // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html
+    Bucket: bucket,
+  });
+  try {
+    await s3.send(command);
+  } catch (error) {
+    throw new Error(`Error creating bucket: ${error}`);
+  }
+};
+
 export const uploadPDF = async (id: string, path: string) => {
   const bucket = config?.objectStore.buckets[0].name;
   apiLogger.debug(`${JSON.stringify(config?.objectStore)}`);
+  const exists = await checkBucketExists(bucket);
+  if (!exists) {
+    await createBucket(bucket);
+  }
   try {
     // Create a read stream for the PDF file
     const fileStream = createReadStream(path);
@@ -48,6 +85,7 @@ export const uploadPDF = async (id: string, path: string) => {
       Body: fileStream,
       ContentType: 'application/pdf',
     };
+    console.log({ uploadParams });
 
     // Upload the file to S3
     const response = await s3.send(new PutObjectCommand(uploadParams));
@@ -59,12 +97,17 @@ export const uploadPDF = async (id: string, path: string) => {
 
 export const downloadPDF = async (id: string) => {
   const bucket = config?.objectStore.buckets[0].name;
+  const collection = PdfCache.getInstance().getCollection(id);
+  const components = collection.components.map(
+    (component) => `${component.componentId}.pdf`
+  );
   try {
     // Define the parameters for the S3 download
     const downloadParams = {
       Bucket: bucket,
-      Key: `${id}.pdf`,
+      Key: components[0],
     };
+    console.log({});
 
     // Send the GetObjectCommand to S3
     const response = await s3.send(new GetObjectCommand(downloadParams));
