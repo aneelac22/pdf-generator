@@ -42,7 +42,13 @@ const getNewPdfName = (id: string) => {
 };
 
 export const generatePdf = async (
-  { url, identity, fetchDataParams, uuid: componentId }: PdfRequestBody,
+  {
+    url,
+    identity,
+    fetchDataParams,
+    uuid: componentId,
+    authHeader,
+  }: PdfRequestBody,
   collectionId: string
 ): Promise<string> => {
   const pdfPath = getNewPdfName(componentId);
@@ -68,20 +74,24 @@ export const generatePdf = async (
             pageHeight,
           },
         })
-        // }) as undefined // probably a typings issue in puppeteer
       );
 
-      await page.setExtraHTTPHeaders({
-        ...(fetchDataParams
-          ? {
-              [config?.OPTIONS_HEADER_NAME]: JSON.stringify(fetchDataParams),
-            }
-          : {}),
+      const extraHeaders: Record<string, string> = {};
+      if (config?.IS_DEVELOPMENT && !identity) {
+        extraHeaders['x-rh-identity'] = identity;
+      }
 
-        ...(config?.IS_DEVELOPMENT && !identity
-          ? {}
-          : { 'x-rh-identity': identity }),
-      });
+      if (fetchDataParams) {
+        extraHeaders[config?.OPTIONS_HEADER_NAME] =
+          JSON.stringify(fetchDataParams);
+      }
+
+      if (authHeader) {
+        console.log({ authHeader, k: config.AUTHORIZATION_CONTEXT_KEY });
+        extraHeaders[config.AUTHORIZATION_CONTEXT_KEY] = authHeader;
+      }
+
+      await page.setExtraHTTPHeaders(extraHeaders);
 
       // Intercept font requests from chrome and send them from dist
       await page.setRequestInterception(true);

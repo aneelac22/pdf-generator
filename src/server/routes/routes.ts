@@ -59,7 +59,12 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (req) => {
-          console.log(req.getHeaders());
+          // set AUTH header for gateway
+          req.setHeader(
+            config.AUTHORIZATION_HEADER_KEY,
+            req.getHeader(config.AUTHORIZATION_CONTEXT_KEY) as string
+          );
+          req.removeHeader(config?.AUTHORIZATION_CONTEXT_KEY);
         },
       },
       logger: apiLogger,
@@ -89,6 +94,7 @@ function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
   }
   return {
     ...payload,
+    authHeader: httpContext.get(config.AUTHORIZATION_CONTEXT_KEY) as string,
     identity: httpContext.get(config?.IDENTITY_HEADER_KEY) as string,
     uuid,
     url: requestURL.toString(),
@@ -148,7 +154,6 @@ router.post(
         if (configHeaders) {
           delete req.headers[config?.OPTIONS_HEADER_NAME];
         }
-        console.log(req.header('Authorization'));
         apiLogger.debug(`Single call to generator queued for ${collectionId}`);
         await generatePdf(pdfDetails, collectionId);
         const updateMessage = {

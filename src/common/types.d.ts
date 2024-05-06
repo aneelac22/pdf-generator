@@ -11,6 +11,7 @@ export type GeneratePayload = {
   scope: string;
   module: string;
   importName?: string;
+  authHeader: string;
   fetchDataParams?: Record<string, unknown>;
   identity: string;
 };

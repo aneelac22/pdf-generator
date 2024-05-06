@@ -33,6 +33,8 @@ const defaultConfig: {
   OPTIONS_HEADER_NAME: string;
   IDENTITY_CONTEXT_KEY: string;
   IDENTITY_HEADER_KEY: string;
+  AUTHORIZATION_HEADER_KEY: string;
+  AUTHORIZATION_CONTEXT_KEY: string;
   ACCOUNT_ID: string;
   LOG_LEVEL: string;
   scalprum: {
@@ -95,6 +97,8 @@ const defaultConfig: {
   OPTIONS_HEADER_NAME: 'x-pdf-gen-options',
   IDENTITY_CONTEXT_KEY: 'identity',
   IDENTITY_HEADER_KEY: 'x-rh-identity',
+  AUTHORIZATION_HEADER_KEY: 'Authorization',
+  AUTHORIZATION_CONTEXT_KEY: 'x-pdf-auth',
   ACCOUNT_ID: '',
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   scalprum: {
