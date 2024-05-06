@@ -275,14 +275,12 @@ router.get(
           },
         });
       }
-      if (response.ContentLength && response.ContentLength > 0) {
-        const contentLength = response.ContentLength;
-        res.setHeader('Content-Length', contentLength);
+      if (response.byteLength && response.byteLength > 0) {
+        res.setHeader('Content-Length', response.byteLength);
       }
       res.setHeader('Content-Disposition', `inline; filename="${ID}.pdf"`);
       res.setHeader('Content-Type', 'application/pdf');
-      const stream = response.Body as Readable;
-      stream.pipe(res);
+      res.send(response);
     } catch (error) {
       res.status(400).send({
         error: {

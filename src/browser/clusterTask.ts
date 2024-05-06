@@ -87,7 +87,6 @@ export const generatePdf = async (
       }
 
       if (authHeader) {
-        console.log({ authHeader, k: config.AUTHORIZATION_CONTEXT_KEY });
         extraHeaders[config.AUTHORIZATION_CONTEXT_KEY] = authHeader;
       }
 

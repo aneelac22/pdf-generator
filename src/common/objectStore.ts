@@ -1,3 +1,5 @@
+import PDFMerger from 'pdf-merger-js';
+import { promisify } from 'util';
 import { apiLogger } from './logging';
 import config from './config';
 import {
@@ -7,8 +9,15 @@ import {
   HeadBucketCommand,
   CreateBucketCommand,
 } from '@aws-sdk/client-s3';
-import { createReadStream } from 'fs-extra';
+import {
+  createReadStream,
+  ensureDirSync,
+  createWriteStream,
+  writeFile,
+} from 'fs-extra';
 import PdfCache from './pdfCache';
+
+const asyncWriteFile = promisify(writeFile);
 
 export const StorageClient = () => {
   if (config?.objectStore.tls) {
@@ -85,7 +94,6 @@ export const uploadPDF = async (id: string, path: string) => {
       Body: fileStream,
       ContentType: 'application/pdf',
     };
-    console.log({ uploadParams });
 
     // Upload the file to S3
     const response = await s3.send(new PutObjectCommand(uploadParams));
@@ -101,19 +109,53 @@ export const downloadPDF = async (id: string) => {
   const components = collection.components.map(
     (component) => `${component.componentId}.pdf`
   );
+  const tmpdir = `/tmp/${id}-components/*`;
+  ensureDirSync(tmpdir);
   try {
     // Define the parameters for the S3 download
-    const downloadParams = {
-      Bucket: bucket,
-      Key: components[0],
-    };
-    console.log({});
+    const tasks = await Promise.all(
+      components.map((component) => {
+        const downloadParams = {
+          Bucket: bucket,
+          Key: component,
+        };
+        return s3.send(new GetObjectCommand(downloadParams));
+      })
+    );
 
     // Send the GetObjectCommand to S3
-    const response = await s3.send(new GetObjectCommand(downloadParams));
+    const fragments = await Promise.all(tasks);
+    const fragmentNames: string[] = [];
+    const writeTasks = fragments.map((fragment, index) => {
+      return new Promise<void>((resolve, reject) => {
+        const fragmentName = `${tmpdir}/${index}.pdf`;
+        fragment.Body?.transformToByteArray()
+          .then((data) => {
+            return asyncWriteFile(fragmentName, data);
+          })
+          .then(() => {
+            fragmentNames.push(fragmentName);
+            resolve();
+          })
+          .catch((error) => {
+            reject(error);
+          });
+      });
+    });
+
+    await Promise.all(writeTasks);
+    const merger = new PDFMerger();
+    const addTasks: Promise<void>[] = [];
+    fragmentNames.forEach((fragmentName) => {
+      addTasks.push(merger.add(fragmentName));
+    });
+    await Promise.all(addTasks);
+    const buffer = await merger.saveAsBuffer();
+
     apiLogger.debug(`PDF found downloading as ${id}.pdf`);
-    return response;
+    return buffer;
   } catch (error) {
     apiLogger.debug(`Error downloading file: ${error}`);
+    throw error;
   }
 };

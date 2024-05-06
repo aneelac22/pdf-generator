@@ -44,7 +44,6 @@ const getNewPdfName = () => {
 
 const generatePdf = async (data: PdfRequestBody) => {
   const { url, identity, uuid, fetchDataParams } = data;
-  console.log('generatePdf', data);
   const pdfPath = getNewPdfName();
   const createFilename = async () => {
     apiLogger.debug(uuid);
@@ -92,7 +91,6 @@ const generatePdf = async (data: PdfRequestBody) => {
       })
       // }) as undefined // probably a typings issue in puppeteer
     );
-    console.log('Identity in worker: ', identity);
     await page.setExtraHTTPHeaders({
       ...(fetchDataParams
         ? {
@@ -123,8 +121,6 @@ const generatePdf = async (data: PdfRequestBody) => {
       }
     });
 
-    console.log({ error });
-
     // error happened during page rendering
     if (error && error.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,8 +137,6 @@ const generatePdf = async (data: PdfRequestBody) => {
       throw new Error(`Page render error: ${response}`);
     }
 
-    console.log(pageStatus?.statusText(), pageStatus?.ok());
-
     if (!pageStatus?.ok() && pageStatus?.statusText() !== 'Not Modified') {
       apiLogger.debug(`Page status: ${pageStatus?.statusText()}`);
       throw new Error(
@@ -150,7 +144,6 @@ const generatePdf = async (data: PdfRequestBody) => {
       );
     }
 
-    console.log('pdfPath', pdfPath);
     const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     try {
