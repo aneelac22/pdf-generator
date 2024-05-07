@@ -7,7 +7,6 @@ import config from '../common/config';
 const identityMiddleware: Handler = (req, _res, next) => {
   try {
     const rhIdentity = req.header(config.IDENTITY_HEADER_KEY);
-    apiLogger.info(`Identity Middleware: ${rhIdentity}`);
     if (rhIdentity) {
       const identityObject = JSON.parse(
         Buffer.from(rhIdentity, 'base64').toString()

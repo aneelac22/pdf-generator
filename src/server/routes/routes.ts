@@ -49,18 +49,27 @@ function addProxy(req: GenerateHandlerRequest) {
       changeOrigin: true,
       pathFilter: (path) => path.startsWith('/apps'),
       preserveHeaderKeyCase: true,
+      secure: false,
+      autoRewrite: true,
+      headers: {
+        origin: config.scalprum.assetsHost,
+      },
       on: {
-        proxyReq: (req) => {
-          req.setHeader('origin', config.scalprum.assetsHost);
-          const identityHeader = req.getHeader(config.IDENTITY_HEADER_KEY);
+        proxyReq: (proxyReq, req) => {
+          console.log(proxyReq.getHeaders());
+          req.headers['host'] = config.scalprum.assetsHost;
+          proxyReq.setHeader('origin', config.scalprum.assetsHost);
+          const identityHeader = proxyReq.getHeader(config.IDENTITY_HEADER_KEY);
           apiLogger.debug(`Identity header: ${identityHeader}`);
-          const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          const authHeader = proxyReq.getHeader(
+            config.AUTHORIZATION_CONTEXT_KEY
+          );
           apiLogger.debug(`Auth header: ${authHeader}`);
           if (authHeader) {
-            req.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
+            proxyReq.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
           }
           // set AUTH header for gateway
-          req.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
       logger: apiLogger,
@@ -68,18 +77,26 @@ function addProxy(req: GenerateHandlerRequest) {
     const apiProxy = createProxyMiddleware({
       target: config.scalprum.apiHost,
       changeOrigin: true,
+      secure: false,
+      autoRewrite: true,
+      headers: {
+        origin: config.scalprum.assetsHost,
+      },
       pathFilter: (path) =>
         path.startsWith('/api') && !path.includes('crc-pdf-generator'),
       preserveHeaderKeyCase: true,
       on: {
-        proxyReq: (req) => {
-          req.setHeader('origin', config.scalprum.apiHost);
-          const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
+        proxyReq: (proxyReq) => {
+          req.headers['host'] = config.scalprum.apiHost;
+          proxyReq.setHeader('origin', config.scalprum.apiHost);
+          const authHeader = proxyReq.getHeader(
+            config.AUTHORIZATION_CONTEXT_KEY
+          );
           if (authHeader) {
-            req.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
+            proxyReq.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
           }
           // set AUTH header for gateway
-          req.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
       logger: apiLogger,
@@ -169,9 +186,7 @@ router.post(
         if (configHeaders) {
           delete req.headers[config?.OPTIONS_HEADER_NAME];
         }
-        apiLogger.debug(
-          `Single call to generator queued for ${collectionId}, header: ${pdfDetails.identity}`
-        );
+        apiLogger.debug(`Single call to generator queued for ${collectionId}`);
         await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',
