@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import cors from 'cors';
 import promBundle from 'express-prom-bundle';
 import httpContext from 'express-http-context';
 import http from 'http';
@@ -15,7 +14,6 @@ import { UPDATE_TOPIC } from '../browser/constants';
 const PORT = config?.webPort;
 
 const app = express();
-app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.resolve(__dirname, '..', 'build')));
 app.use(express.static(path.resolve(__dirname, '../public')));

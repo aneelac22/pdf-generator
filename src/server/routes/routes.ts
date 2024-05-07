@@ -56,7 +56,6 @@ function addProxy(req: GenerateHandlerRequest) {
       },
       on: {
         proxyReq: (proxyReq, req) => {
-          console.log(proxyReq.getHeaders());
           req.headers['host'] = config.scalprum.assetsHost;
           proxyReq.setHeader('origin', config.scalprum.assetsHost);
           const identityHeader = proxyReq.getHeader(config.IDENTITY_HEADER_KEY);
@@ -68,8 +67,15 @@ function addProxy(req: GenerateHandlerRequest) {
           if (authHeader) {
             proxyReq.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
           }
+          req.headers['referer'] = config.scalprum.assetsHost;
+          proxyReq.setHeader('referer', config.scalprum.assetsHost);
+          proxyReq.setHeader(
+            'x-forwarded-host',
+            config.scalprum.assetsHost.replace('https://', '')
+          );
           // set AUTH header for gateway
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          console.log(proxyReq.getHeaders());
         },
       },
       logger: apiLogger,
@@ -95,7 +101,13 @@ function addProxy(req: GenerateHandlerRequest) {
           if (authHeader) {
             proxyReq.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
           }
-          // set AUTH header for gateway
+          req.headers['referer'] = config.scalprum.apiHost;
+          proxyReq.setHeader('referer', config.scalprum.apiHost);
+          proxyReq.setHeader(
+            'x-forwarded-host',
+            config.scalprum.apiHost.replace('https://', '')
+          );
+
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
