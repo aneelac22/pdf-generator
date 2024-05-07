@@ -1,88 +1,16 @@
-const { DefinePlugin } = require('webpack');
-const {
-  createJoinFunction,
-  createJoinImplementation,
-  asGenerator,
-  defaultJoinGenerator,
-} = require('resolve-url-loader');
+const { DefinePlugin, container } = require('webpack');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const path = require('path');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const { merge } = require('webpack-merge');
-
-// call default generator then pair different variations of uri with each base
-const myGenerator = asGenerator((item, ...rest) => {
-  const defaultTuples = [...defaultJoinGenerator(item, ...rest)];
-  if (item.uri.includes('./assets')) {
-    return defaultTuples.map(([base]) => {
-      if (base.includes('@patternfly/patternfly')) {
-        return [
-          base,
-          path.relative(
-            base,
-            path.resolve(
-              __dirname,
-              '../node_modules/@patternfly/patternfly',
-              item.uri
-            )
-          ),
-        ];
-      }
-    });
-  }
-  return defaultTuples;
-});
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const baseConfig = {
   mode: process.env.NODE_ENV || 'development',
   devtool: 'source-map',
   resolve: {
     extensions: ['.ts', '.tsx', '.js'],
-    alias: {
-      // ...searchIgnoredStyles(path.resolve(__dirname, '../')),
-    },
   },
-};
-
-const stylesConfig = {
-  mode: 'production',
-  name: 'styles',
-  entry: path.resolve(__dirname, '../src/styles/styles.scss'),
-  output: {
-    path: path.resolve(__dirname, '../public'),
-    filename: 'styles.css',
-  },
-  module: {
-    rules: [
-      {
-        test: /\.s?[ac]ss$/,
-        use: [
-          MiniCssExtractPlugin.loader,
-          'css-loader',
-          {
-            loader: 'resolve-url-loader',
-            options: {
-              join: createJoinFunction(
-                'myJoinFn',
-                createJoinImplementation(myGenerator)
-              ),
-            },
-          },
-          {
-            loader: 'sass-loader',
-            options: {
-              sourceMap: true,
-            },
-          },
-        ],
-      },
-    ],
-  },
-  plugins: [
-    new MiniCssExtractPlugin({
-      filename: '[name].css',
-    }),
-  ],
 };
 
 const serverConfig = {
@@ -114,7 +42,6 @@ const serverConfig = {
   output: {
     path: path.resolve(__dirname, '../dist'),
     filename: '[name].js',
-    publicPath: './', // file-loader prepends publicPath to the emited url. without this, react will complain about server and client mismatch
   },
   externals: {
     // puppeteer cannot be bundled via webpack. It will break the rendering. Pupetter will be loaded via node_modules even in prod version
@@ -122,20 +49,23 @@ const serverConfig = {
   },
   module: {
     rules: [
-      { test: /\.(js|tsx?)$/, loader: 'ts-loader', exclude: /node_modules/ },
       {
-        test: /\.s?[ac]ss$/,
-        use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader'],
-      },
-      {
-        // file-loader config must match client's (except 'emitFile' property)
-        test: /\.(jpg|png|gif|svg)$/,
+        test: /\.tsx?$/,
+        exclude: /(node_modules)/,
         use: {
-          loader: 'file-loader',
+          loader: 'swc-loader',
           options: {
-            outputPath: 'images',
-            name: '[name].[contenthash].[ext]',
-            emitFile: false,
+            jsc: {
+              transform: {
+                react: {
+                  runtime: 'automatic',
+                },
+              },
+              parser: {
+                syntax: 'typescript',
+                tsx: true,
+              },
+            },
           },
         },
       },
@@ -148,12 +78,89 @@ const serverConfig = {
     new DefinePlugin({
       __Server__: JSON.stringify(true),
     }),
-    new MiniCssExtractPlugin({
-      filename: '../public/[name].css',
-    }),
   ],
+};
+
+const moduleFederationPlugin = new container.ModuleFederationPlugin({
+  filename: 'pdfClient.[contenthash].js',
+  library: {
+    type: 'global',
+    name: 'pdfClient',
+  },
+  shared: {
+    react: {
+      requiredVersion: '*',
+      singleton: true,
+    },
+    'react-dom': {
+      requiredVersion: '*',
+      singleton: true,
+    },
+    'react-router-dom': {
+      requiredVersion: '*',
+      singleton: true,
+    },
+    '@scalprum/core': {
+      requiredVersion: '*',
+      singleton: true,
+    },
+    '@scalprum/react-core': {
+      requiredVersion: '*',
+      singleton: true,
+    },
+  },
+});
+
+const clientConfig = {
+  name: 'client',
+  target: 'web',
+  entry: {
+    client: path.resolve(__dirname, '../src/client/client.ts'),
+  },
+  output: {
+    path: path.resolve(__dirname, '../dist/public'),
+    filename: '[name].js',
+  },
+  plugins: [
+    moduleFederationPlugin,
+    new HtmlWebpackPlugin({
+      template: path.resolve(__dirname, '../src/client/index.html'),
+      publicPath: '/public/',
+    }),
+    new MiniCssExtractPlugin(),
+  ],
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        exclude: /(node_modules)/,
+        use: {
+          loader: 'swc-loader',
+          options: {
+            jsc: {
+              transform: {
+                react: {
+                  runtime: 'automatic',
+                },
+              },
+              parser: {
+                syntax: 'typescript',
+                tsx: true,
+              },
+            },
+          },
+        },
+      },
+      {
+        test: /\.css$/i,
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
+      },
+    ],
+  },
 };
 
 const srConfig = merge(baseConfig, serverConfig);
 
-module.exports = [srConfig, stylesConfig];
+const clConfig = merge(baseConfig, clientConfig);
+
+module.exports = [srConfig, clConfig];

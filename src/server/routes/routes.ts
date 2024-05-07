@@ -1,97 +1,115 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import fs from 'fs';
-import { Router } from 'express';
-import httpContext from 'express-http-context';
-import getTemplateData from '../data-access';
-import ServiceNames from '../../common/service-names';
-import renderTemplate from '../render-template';
-import {
-  processOrientationOption,
-  sanitizeFilepath,
-  sanitizeTemplateConfig,
-} from '../../browser/helpers';
+import crypto from 'crypto';
 import PdfCache from '../../common/pdfCache';
-import {
-  SendingFailedError,
-  PDFNotFoundError,
-  PdfGenerationError,
-} from '../errors';
+import { PdfGenerationError } from '../errors';
+import { Router, Request } from 'express';
+import httpContext from 'express-http-context';
+import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
-import pool from '../workers';
-import { Request } from 'express';
 import {
   GenerateHandlerRequest,
   PdfRequestBody,
   PuppeteerBrowserRequest,
   PreviewHandlerRequest,
+  GeneratePayload,
 } from '../../common/types';
 import { apiLogger } from '../../common/logging';
-import { v4 as uuidv4 } from 'uuid';
-import { ReportCache } from '../cache';
 import { downloadPDF } from '../../common/objectStore';
 import { Readable } from 'stream';
-import { UpdateStatus, sanitizeRecord } from '../utils';
+import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
-import { API_CALL_LIMIT } from '../../browser/constants';
-import { isRosSystemsData } from '../data-access/rosDescriptor/rosData';
-
-const CALL_LIMIT = Number(process.env.API_CALL_LIMIT) || API_CALL_LIMIT;
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const router = Router();
-const cache = new ReportCache();
 const pdfCache = PdfCache.getInstance();
 
-function getPdfRequestBody(req: GenerateHandlerRequest): PdfRequestBody {
-  const rhIdentity = httpContext.get(config?.IDENTITY_HEADER_KEY);
-  const orientationOption = processOrientationOption(req);
-  const service = req.body.service;
-  const template = req.body.template;
-  const dataOptions = req.body;
-  const uuid = `${uuidv4()}`;
-  const url = `http://localhost:${config?.webPort}?template=${template}&service=${service}`;
+let hasProxy = false;
+
+function addProxy(req: GenerateHandlerRequest) {
+  if (!hasProxy) {
+    if (config.scalprum.apiHost === 'blank') {
+      const apiHost = 'https' + '://' + req.get('host');
+      config.scalprum.apiHost = apiHost;
+      apiLogger.debug(
+        `The variable apiHost is not in config! Falling back to request origin host: ${apiHost}`
+      );
+    }
+    if (config.scalprum.assetsHost === 'blank') {
+      const assetsHost = 'https' + '://' + req.get('host');
+      config.scalprum.assetsHost = assetsHost;
+      apiLogger.debug(
+        `The variable assetsHost is not in config! Falling back to request origin host: ${assetsHost}`
+      );
+    }
+    const assetsProxy = createProxyMiddleware({
+      target: config.scalprum.assetsHost,
+      changeOrigin: true,
+      pathFilter: (path) => path.startsWith('/apps'),
+      logger: apiLogger,
+    });
+    const apiProxy = createProxyMiddleware({
+      target: config.scalprum.apiHost,
+      changeOrigin: true,
+      pathFilter: (path) =>
+        path.startsWith('/api') && !path.includes('crc-pdf-generator'),
+      preserveHeaderKeyCase: true,
+      on: {
+        proxyReq: (req) => {
+          // set AUTH header for gateway
+          req.setHeader(
+            config.AUTHORIZATION_HEADER_KEY,
+            req.getHeader(config.AUTHORIZATION_CONTEXT_KEY) as string
+          );
+          req.removeHeader(config?.AUTHORIZATION_CONTEXT_KEY);
+        },
+      },
+      logger: apiLogger,
+    });
+    router.use(assetsProxy);
+    router.use(apiProxy);
+    hasProxy = true;
+  }
+}
+
+function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
+  const { manifestLocation, module, scope, fetchDataParams, importName } =
+    payload;
+  const uuid = crypto.randomUUID();
+  const requestURL = new URL(`http://localhost:${config?.webPort}/puppeteer`);
+  requestURL.searchParams.append('manifestLocation', manifestLocation);
+  requestURL.searchParams.append('scope', scope);
+  requestURL.searchParams.append('module', module);
+  if (importName) {
+    requestURL.searchParams.append('importName', importName);
+  }
+  if (fetchDataParams) {
+    requestURL.searchParams.append(
+      'fetchDataParams',
+      JSON.stringify(fetchDataParams)
+    );
+  }
   return {
-    url,
-    rhIdentity,
-    templateConfig: {
-      service,
-      template,
-    },
-    orientationOption,
-    dataOptions,
+    ...payload,
+    authHeader: httpContext.get(config.AUTHORIZATION_CONTEXT_KEY) as string,
+    identity: httpContext.get(config?.IDENTITY_HEADER_KEY) as string,
     uuid,
+    url: requestURL.toString(),
   };
 }
 
-const isValidPdfRequest = (body: PdfRequestBody) => {
-  // identity is handled at the worker level
-  if (
-    body.templateConfig.template === '' ||
-    !Object.values(ServiceNames).includes(body.templateConfig.service)
-  ) {
-    return false;
-  }
-  return true;
-};
-
 // Middleware that activates on all routes, responsible for rendering the correct
 // template/component into html to the requester.
-router.use('^/$', async (req: PuppeteerBrowserRequest, res, _next) => {
-  let service: ServiceNames = req.query.service;
-  let template: string = req.query.template;
-  if (!service) {
-    apiLogger.warning('Missing service, using "demo"');
-    service = ServiceNames.demo;
-  }
-  if (!template) {
+router.get('/puppeteer', (req: PuppeteerBrowserRequest, res, _next) => {
+  addProxy(req as any);
+  const payload = req.query;
+  if (!payload) {
     apiLogger.warning('Missing template, using "demo"');
-    template = 'demo';
+    throw new Error('Missing template metadata!');
   }
-
-  const templateConfig = {
-    service,
-    template,
-  };
   try {
     const configHeaders: string | string[] | undefined =
       req.headers[config?.OPTIONS_HEADER_NAME];
@@ -99,39 +117,7 @@ router.use('^/$', async (req: PuppeteerBrowserRequest, res, _next) => {
       delete req.headers[config?.OPTIONS_HEADER_NAME];
     }
 
-    const templateData = await getTemplateData(
-      req.headers,
-      templateConfig,
-      configHeaders ? JSON.parse(configHeaders as string) : undefined
-    );
-
-    const start = req.headers['start'];
-    const end = req.headers['end'];
-    if (
-      start !== 'undefined' &&
-      end !== 'undefined' &&
-      start !== undefined &&
-      end !== undefined
-    ) {
-      apiLogger.debug(
-        `Processing data range ${req.headers['start']}::${req.headers['end']}`
-      );
-      const clone = JSON.parse(JSON.stringify(templateData));
-      const castData = clone as Record<string, any>;
-      const slicedData = castData.data.data.slice(start, end);
-      castData.data.data = slicedData;
-      const HTMLTemplate: string = renderTemplate(
-        sanitizeTemplateConfig(templateConfig),
-        sanitizeRecord(castData)
-      );
-      res.send(HTMLTemplate);
-      return;
-    }
-
-    const HTMLTemplate: string = renderTemplate(
-      sanitizeTemplateConfig(templateConfig),
-      sanitizeRecord(templateData as Record<string, unknown>)
-    );
+    const HTMLTemplate: string = renderTemplate(payload);
     res.send(HTMLTemplate);
   } catch (error) {
     // render error to DOM to retrieve the error content from puppeteer
@@ -147,90 +133,53 @@ router.get(`${config?.APIPrefix}/v1/hello`, (_req, res) => {
   return res.status(200).send('<h1>Well this works!</h1>');
 });
 
-type RenderData = {
-  totalItems: number;
-  calls: number;
-  renderableData: any;
-};
-
-// TODO: This is not and will be fixed when federated magic is applied
-const processTemplateRequest = (templateData: any) => {
-  const renderData: RenderData = <RenderData>{};
-  switch (true) {
-    case isRosSystemsData(templateData.data) == true: {
-      const baseData = templateData.data.data;
-      if (Array.isArray(baseData)) {
-        renderData.totalItems = baseData.length;
-        renderData.calls = Math.ceil(renderData.totalItems / CALL_LIMIT);
-        renderData.renderableData = baseData;
-      }
-      return renderData;
-    }
-    default:
-      apiLogger.debug('no matching data for template');
-      break;
-  }
-};
-
 router.post(
   `${config?.APIPrefix}/v2/create`,
-  async (req: GenerateHandlerRequest, res, next) => {
-    // need to support multiple IDs in a group
-    // and await the results to combine
-    const pdfDetails = getPdfRequestBody(req);
-    const collectionId = pdfDetails.uuid;
-    if (!isValidPdfRequest(pdfDetails)) {
-      const errStr = 'Failed: service and template options must not be empty';
-      apiLogger.debug(errStr);
-      return res.status(400).send({
-        error: {
-          status: 400,
-          statusText: 'Bad Request',
-          description: `${errStr}`,
-        },
-      });
-    }
-    const configHeaders: string | string[] | undefined =
-      req.headers[config?.OPTIONS_HEADER_NAME];
-    if (configHeaders) {
-      delete req.headers[config?.OPTIONS_HEADER_NAME];
-    }
-
-    const templateRequest = await getTemplateData(
-      req.headers,
-      pdfDetails.templateConfig,
-      configHeaders ? JSON.parse(configHeaders as string) : undefined
-    );
-    const renderData = processTemplateRequest(templateRequest);
+  async (req: GenerateHandlerRequest, res) => {
+    addProxy(req);
+    const collectionId = crypto.randomUUID();
+    // for testing purposes
+    const requestConfigs = Array.isArray(req.body.payload)
+      ? req.body.payload
+      : [req.body.payload];
 
     try {
-      const requiredCalls = renderData?.calls;
+      const requiredCalls = requestConfigs.length;
       if (requiredCalls === 1) {
-        const id = `${uuidv4()}`;
+        // need to support multiple IDs in a group
+        // and await the results to combine
+        const pdfDetails = getPdfRequestBody(requestConfigs[0]);
+        const configHeaders: string | string[] | undefined =
+          req.headers[config?.OPTIONS_HEADER_NAME];
+        if (configHeaders) {
+          delete req.headers[config?.OPTIONS_HEADER_NAME];
+        }
         apiLogger.debug(`Single call to generator queued for ${collectionId}`);
-        await generatePdf(pdfDetails, {}, id);
+        await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',
           filepath: '',
-          componentId: id,
-          collectionId: collectionId,
+          componentId: pdfDetails.uuid,
+          collectionId,
         };
         UpdateStatus(updateMessage);
         return res.status(202).send({ statusID: collectionId });
       }
       // add these in a loop
-      apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
+      // LOOP based on payload length
       for (let x = 0; x < Number(requiredCalls); x++) {
-        const segmentStart = x * CALL_LIMIT;
-        const segmentEnd = segmentStart + CALL_LIMIT - 1;
-        const dataRange = { start: segmentStart, end: segmentEnd };
-
-        const id = `${uuidv4()}`;
-        await generatePdf(pdfDetails, dataRange, id);
+        const pdfDetails = getPdfRequestBody(requestConfigs[x]);
+        const configHeaders: string | string[] | undefined =
+          req.headers[config?.OPTIONS_HEADER_NAME];
+        if (configHeaders) {
+          delete req.headers[config?.OPTIONS_HEADER_NAME];
+        }
+        apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
+        await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',
           filepath: '',
-          componentId: id,
+          componentId: pdfDetails.uuid,
           collectionId: collectionId,
         };
         UpdateStatus(updateMessage);
@@ -273,7 +222,6 @@ router.post(
           });
         }
       }
-      next();
     } finally {
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
@@ -290,7 +238,7 @@ router.get(`${config?.APIPrefix}/v2/status/:statusID`, (req: Request, res) => {
     const status = pdfCache.getCollection(ID);
     apiLogger.debug(JSON.stringify(status));
     if (!status) {
-      res.status(404).send({
+      return res.status(404).send({
         error: {
           status: 404,
           statusText: 'PDF status could not be determined; Please check the ID',
@@ -301,7 +249,7 @@ router.get(`${config?.APIPrefix}/v2/status/:statusID`, (req: Request, res) => {
 
     return res.status(200).send({ status });
   } catch (error) {
-    res.status(400).send({
+    return res.status(400).send({
       error: {
         status: 400,
         statusText: 'PDF status could not be determined',
@@ -327,14 +275,12 @@ router.get(
           },
         });
       }
-      if (response.ContentLength && response.ContentLength > 0) {
-        const contentLength = response.ContentLength;
-        res.setHeader('Content-Length', contentLength);
+      if (response.byteLength && response.byteLength > 0) {
+        res.setHeader('Content-Length', response.byteLength);
       }
       res.setHeader('Content-Disposition', `inline; filename="${ID}.pdf"`);
       res.setHeader('Content-Type', 'application/pdf');
-      const stream = response.Body as Readable;
-      stream.pipe(res);
+      res.send(response);
     } catch (error) {
       res.status(400).send({
         error: {
@@ -349,140 +295,33 @@ router.get(
 
 router.post(
   `${config?.APIPrefix}/v1/generate`,
-  async (req: GenerateHandlerRequest, res, next) => {
-    const pdfDetails = getPdfRequestBody(req);
-    const { rhIdentity: _, ...noIdentityHeader } = pdfDetails;
-    const accountID = httpContext.get(config?.ACCOUNT_ID);
-    const ID = pdfDetails.uuid;
-    const cacheKey = cache.createCacheKey({
-      request: noIdentityHeader,
-      accountID: accountID,
-    });
-    apiLogger.debug(`Hashed key ${cacheKey} with Account ID ${accountID}`);
-
-    // Check for a cached version of the pdf
-    const filePath = cache.fetch(sanitizeFilepath(cacheKey));
-    if (filePath) {
-      apiLogger.info(`No new generation needed ${filePath} found in cache.`);
-      return res.status(200).sendFile(sanitizeFilepath(filePath), (err) => {
-        if (err) {
-          const errorMessage = new SendingFailedError(filePath, err);
-          res.status(500).send({
-            error: {
-              status: 500,
-              statusText: 'PDF was generated, but could not be sent',
-              description: `${errorMessage}`,
-            },
-          });
-        }
-      });
-    }
-
-    apiLogger.debug(JSON.stringify(pool.stats(), null, 2));
-
-    try {
-      const pathToPdf = await pool.exec<(...args: unknown[]) => string>(
-        'generatePdf',
-        [pdfDetails]
-      );
-
-      const pdfFileName = pathToPdf.split('/').pop();
-
-      if (!fs.existsSync(pathToPdf)) {
-        throw new PDFNotFoundError(pdfFileName as string);
-      }
-      cache.fill(cacheKey, pathToPdf);
-      res.setHeader('Content-Disposition', `inline; filename="${ID}.pdf"`);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Deprecated', 'True');
-      const sanitizedPath = sanitizeFilepath(pathToPdf);
-      return res.status(200).sendFile(sanitizedPath, (err) => {
-        if (err) {
-          const errorMessage = new SendingFailedError(
-            pdfFileName as string,
-            err
-          );
-          res.status(500).send({
-            error: {
-              status: 500,
-              statusText: 'PDF was generated, but could not be sent',
-              description: `${errorMessage}`,
-            },
-          });
-        }
-        apiLogger.info('Successfully generated report');
-      });
-    } catch (error: unknown) {
-      const errStr = `${error}`;
-      if (errStr.includes('No API descriptor')) {
-        apiLogger.error(`Failed to generate a PDF: ${error}`);
-        res.status(400).send({
-          error: {
-            status: 400,
-            statusText: 'Bad Request',
-            description: `${error}`,
-          },
-        });
-      } else {
-        apiLogger.error(`Internal Server error: ${error}`);
-        res.status(500).send({
-          error: {
-            status: 500,
-            statusText: 'Internal server error',
-            description: `${error}`,
-          },
-        });
-      }
-      next();
-    } finally {
-      // To handle the edge case where a pool terminates while the queue isn't empty,
-      // we ensure that the queue is empty and all workers are idle.
-      const stats = pool.stats();
-      apiLogger.debug(JSON.stringify(stats, null, 2));
-      if (
-        stats.pendingTasks === 0 &&
-        stats.totalWorkers === stats.idleWorkers
-      ) {
-        await pool.terminate();
-      }
-    }
+  async (_req: GenerateHandlerRequest, res) => {
+    res.status(400).send('This endpoint is deprecated. Please use /v2/create');
   }
 );
 
 router.get(`/preview`, async (req: PreviewHandlerRequest, res) => {
-  const service: ServiceNames = req.query.service;
-  const template: string = req.query.template;
-  let templateData: unknown;
-  try {
-    templateData = await getTemplateData(req.headers, {
-      service,
-      template,
-    });
-  } catch (error) {
-    return res.status(500).send({
-      errors: [
-        {
-          status: 500,
-          statusText: 'Internal server error',
-          detail: error,
-        },
-      ],
-    });
+  addProxy(req as any);
+  const pdfUrl = new URL(`http://localhost:${config?.webPort}/puppeteer`);
+  pdfUrl.searchParams.append('manifestLocation', req.query.manifestLocation);
+  pdfUrl.searchParams.append('scope', req.query.scope);
+  pdfUrl.searchParams.append('module', req.query.module);
+  pdfUrl.searchParams.append(
+    'identity',
+    httpContext.get(config?.IDENTITY_HEADER_KEY) as string
+  );
+  if (req.query.importName) {
+    pdfUrl.searchParams.append('importName', req.query.importName);
   }
-  const orientationOption = processOrientationOption(req);
-
-  const url = `http://localhost:${config?.webPort}?service=${service}&template=${template}`;
+  if (req.query.fetchDataParams) {
+    pdfUrl.searchParams.append(
+      'fetchDataParams',
+      JSON.stringify(req.query.fetchDataParams)
+    );
+  }
 
   try {
-    const pdfBuffer = await previewPdf(
-      url,
-      {
-        service,
-        template,
-      },
-      templateData as Record<string, unknown>,
-      orientationOption // could later turn into a full options object for other things outside orientation.
-    );
+    const pdfBuffer = await previewPdf(pdfUrl.toString());
     res.set('Content-Type', 'application/pdf');
     res.status(200).send(pdfBuffer);
   } catch (error: unknown) {
@@ -505,7 +344,9 @@ router.get(`${config?.APIPrefix}/v1/openapi.json`, (_req, res, _next) => {
       apiLogger.error(err);
       return res
         .status(500)
-        .send(`An error occurred while fetching the OpenAPI spec : ${err}`);
+        .send(
+          `An error occurred while fetching the OpenAPI spec : ${err.message}`
+        );
     } else {
       return res.json(JSON.parse(data));
     }

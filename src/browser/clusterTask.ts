@@ -2,24 +2,20 @@ import os from 'os';
 import fs from 'fs';
 import { PdfRequestBody } from '../common/types';
 import { apiLogger } from '../common/logging';
-import {
-  getViewportConfig,
-  pageHeight,
-  pageWidth,
-  setWindowProperty,
-} from './helpers';
+import { pageHeight, pageWidth, setWindowProperty } from './helpers';
+import PdfCache from '../common/pdfCache';
 import { getHeaderAndFooterTemplates } from '../server/render-template';
 import config from '../common/config';
 import { uploadPDF } from '../common/objectStore';
 import { UpdateStatus, isValidPageResponse } from '../server/utils';
 import { PdfGenerationError } from '../server/errors';
 import { cluster } from '../server/cluster';
-import { Page } from 'puppeteer';
+import { HTTPRequest, Page } from 'puppeteer';
 
 // Match the timeout on the gateway
 const BROWSER_TIMEOUT = 60_000;
 
-const redirectFontFiles = async (request: any) => {
+const redirectFontFiles = async (request: HTTPRequest) => {
   if (request.url().endsWith('.woff') || request.url().endsWith('.woff2')) {
     const modifiedUrl = request.url().replace(/^http:\/\/localhost:8000\//, '');
     const fontFile = `./dist/${modifiedUrl}`;
@@ -27,7 +23,7 @@ const redirectFontFiles = async (request: any) => {
       if (err) {
         await request.respond({
           status: 404,
-          body: `An error occurred while loading font ${modifiedUrl} : ${err}`,
+          body: `An error occurred while loading font ${modifiedUrl} : ${err.message}`,
         });
       }
       await request.respond({
@@ -48,14 +44,12 @@ const getNewPdfName = (id: string) => {
 export const generatePdf = async (
   {
     url,
-    rhIdentity,
-    templateConfig,
-    orientationOption,
-    dataOptions,
-    uuid,
+    identity,
+    fetchDataParams,
+    uuid: componentId,
+    authHeader,
   }: PdfRequestBody,
-  dataRange: any,
-  componentId: string
+  collectionId: string
 ): Promise<string> => {
   const pdfPath = getNewPdfName(componentId);
   const createFilename = async (): Promise<string> => {
@@ -80,23 +74,23 @@ export const generatePdf = async (
             pageHeight,
           },
         })
-        // }) as undefined // probably a typings issue in puppeteer
       );
 
-      await page.setExtraHTTPHeaders({
-        ...(dataOptions
-          ? {
-              [config?.OPTIONS_HEADER_NAME]: JSON.stringify(dataOptions),
-            }
-          : {}),
+      const extraHeaders: Record<string, string> = {};
+      if (config?.IS_DEVELOPMENT && !identity) {
+        extraHeaders['x-rh-identity'] = identity;
+      }
 
-        ...(config?.IS_DEVELOPMENT && !rhIdentity
-          ? {}
-          : { 'x-rh-identity': rhIdentity }),
-        ...(dataRange
-          ? { start: `${dataRange.start}`, end: `${dataRange.end}` }
-          : {}),
-      });
+      if (fetchDataParams) {
+        extraHeaders[config?.OPTIONS_HEADER_NAME] =
+          JSON.stringify(fetchDataParams);
+      }
+
+      if (authHeader) {
+        extraHeaders[config.AUTHORIZATION_CONTEXT_KEY] = authHeader;
+      }
+
+      await page.setExtraHTTPHeaders(extraHeaders);
 
       // Intercept font requests from chrome and send them from dist
       await page.setRequestInterception(true);
@@ -107,6 +101,10 @@ export const generatePdf = async (
       const pageResponse = await page.goto(url, {
         waitUntil: 'networkidle2',
         timeout: BROWSER_TIMEOUT,
+      });
+      // wait for subsequent network requests to finish
+      await page.waitForNetworkIdle({
+        idleTime: 1000,
       });
       // because a cached response is a 3xx, puppeteer counts cache as an error
       // so we don't use pageResponse.ok()
@@ -122,6 +120,7 @@ export const generatePdf = async (
 
       // error happened during page rendering
       if (error && error.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let response: any;
         try {
           // error should be JSON
@@ -133,14 +132,14 @@ export const generatePdf = async (
           apiLogger.debug(`Page render error ${response}`);
         }
         const updated = {
-          collectionId: uuid,
+          collectionId,
           status: `Failed: ${response}`,
           filepath: '',
           componentId: componentId,
         };
         UpdateStatus(updated);
         throw new PdfGenerationError(
-          uuid,
+          collectionId,
           componentId,
           `Page render error: ${response}`
         );
@@ -148,58 +147,56 @@ export const generatePdf = async (
       if (!pageStatus || !isValidPageResponse(pageStatus)) {
         apiLogger.debug(`Page status: ${pageResponse?.statusText()}`);
         const updated = {
-          collectionId: uuid,
+          collectionId,
           status: `Failed: ${pageResponse?.statusText()}`,
           filepath: '',
           componentId: componentId,
         };
         UpdateStatus(updated);
         throw new PdfGenerationError(
-          uuid,
+          collectionId,
           componentId,
           `Puppeteer error while loading the react app: ${pageResponse?.statusText()}`
         );
       }
-      const { browserMargins, landscape } = getViewportConfig(
-        templateConfig,
-        orientationOption
-      );
 
-      const { headerTemplate, footerTemplate } =
-        getHeaderAndFooterTemplates(templateConfig);
+      const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
       try {
         await page.pdf({
           path: pdfPath,
           format: 'a4',
           printBackground: true,
-          margin: browserMargins,
+          margin: {
+            top: '54px',
+            bottom: '54px',
+          },
           displayHeaderFooter: true,
           headerTemplate,
           footerTemplate,
-          landscape,
           timeout: BROWSER_TIMEOUT,
         });
         uploadPDF(componentId, pdfPath).catch((error: unknown) => {
           apiLogger.error(`Failed to upload PDF: ${error}`);
         });
         const updated = {
-          collectionId: uuid,
+          collectionId,
           status: 'Generated',
           filepath: pdfPath,
           componentId: componentId,
         };
         UpdateStatus(updated);
+        PdfCache.getInstance().verifyCollection(collectionId);
       } catch (error: unknown) {
         const updated = {
-          collectionId: uuid,
+          collectionId,
           status: `Failed to print pdf: ${JSON.stringify(error)}`,
           filepath: '',
           componentId: componentId,
         };
         UpdateStatus(updated);
         throw new PdfGenerationError(
-          uuid,
+          collectionId,
           componentId,
           `Failed to print pdf: ${JSON.stringify(error)}`
         );

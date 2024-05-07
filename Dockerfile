@@ -29,6 +29,7 @@ RUN chmod +x /pdf-gen/bin/dumb-init
 
 # Set node env variable
 ENV NODE_ENV=production
+ENV DEBUG=puppeteer-cluster:*
 
 RUN npm run build
 

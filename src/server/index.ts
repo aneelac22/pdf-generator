@@ -22,6 +22,7 @@ app.use(express.static(path.resolve(__dirname, '../public')));
 app.use(httpContext.middleware);
 app.use(identityMiddleware);
 app.use(requestLogger);
+router.use('/public', express.static(path.resolve(__dirname, './public')));
 app.use('/', router);
 
 PdfCache.getInstance();

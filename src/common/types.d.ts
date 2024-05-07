@@ -1,31 +1,34 @@
-import ServiceNames from './service-names';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import config from './config';
 import { Request } from 'express';
-
-export type TemplateConfig = { service: ServiceNames; template: string };
 
 export type PreviewReqBody = {
   orientation?: string;
 };
 
-export type PreviewReqQuery = {
-  orientation?: string;
-  template: string;
-  service: ServiceNames;
+export type GeneratePayload = {
+  manifestLocation: string;
+  scope: string;
+  module: string;
+  importName?: string;
+  authHeader: string;
+  fetchDataParams?: Record<string, unknown>;
+  identity: string;
 };
 
 export type PreviewHandlerRequest = Request<
   unknown,
   unknown,
   PreviewReqBody,
-  PreviewReqQuery
+  GeneratePayload
 >;
 
 export type GenerateHandlerRequest = Request<
   unknown,
   unknown,
-  Record<string, any>,
-  { service: ServiceNames; template: string }
+  {
+    payload: GeneratePayload | GeneratePayload[];
+  }
 >;
 
 export type HelloHandlerRequest = Request<
@@ -38,18 +41,13 @@ export type HelloHandlerRequest = Request<
 export type PuppeteerBrowserRequest = Request<
   unknown,
   unknown,
-  { data: any },
-  { service: ServiceNames; template: string }
+  unknown,
+  GeneratePayload
 >;
 
-export type PdfRequestBody = {
-  url: string;
-  templateConfig: TemplateConfig;
-  templateData?: Record<string, unknown>;
-  orientationOption?: boolean;
-  rhIdentity: string;
-  dataOptions: Record<string, any>;
+export type PdfRequestBody = GeneratePayload & {
   uuid: string;
+  url: string;
 };
 
 export type CacheKey = {

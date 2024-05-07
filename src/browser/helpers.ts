@@ -1,10 +1,6 @@
-import { Request } from 'express';
-import { Page } from 'puppeteer';
+import type { Page } from 'puppeteer';
 import { glob } from 'glob';
-import { PreviewReqBody, PreviewReqQuery } from '../common/types';
 import config from '../common/config';
-import ServiceNames from '../common/service-names';
-import templates from '../templates';
 
 export const SANITIZE_FILEPATH = /^(\.\.(\/|\\|$))+/;
 export const SANITIZE_REGEX =
@@ -18,46 +14,7 @@ export const sanitizeFilepath = (input: string) => {
   return input.replace(SANITIZE_FILEPATH, '');
 };
 
-export const sanitizeHTTP = (input: string) => {
-  return input.replace(SANITIZE_REGEX, '');
-};
-
-export const toServiceName = (input: string) => {
-  const sanitizedInput = sanitizeHTTP(input);
-  return ServiceNames[sanitizedInput as keyof typeof ServiceNames];
-};
-
-export const sanitizeTemplateConfig = (templateConfig: {
-  service: ServiceNames;
-  template: string;
-}): {
-  service: ServiceNames;
-  template: string;
-} => {
-  return {
-    service: toServiceName(templateConfig.service),
-    template: sanitizeHTTP(templateConfig.template),
-  };
-};
-
 export const MaxWorkers = 4;
-
-export const processOrientationOption = (
-  request: Request<unknown, unknown, PreviewReqBody, PreviewReqQuery>
-) => {
-  let orientationOption = '';
-  if (request.query?.orientation) {
-    orientationOption = request.query?.orientation;
-  } else if (request.body?.orientation) {
-    orientationOption = request.body?.orientation;
-  }
-
-  if (orientationOption === 'landscape') {
-    return true;
-  }
-
-  return undefined;
-};
 
 export const margins = {
   top: '2cm',
@@ -97,36 +54,44 @@ export const setWindowProperty = (page: Page, name: string, value: string) =>
     })
   `);
 
-const getBrowserMargins = (service: ServiceNames, template: string) => {
-  return {
-    ...margins,
-    ...templates?.[service]?.[template]?.browserMargins,
+type PdfStatus = {
+  [statusID: string]: {
+    status: string;
+    filepath: string;
   };
 };
 
-const isLandscape = (
-  service: ServiceNames,
-  template: string,
-  orientation?: boolean
-) => {
-  return typeof orientation !== 'undefined'
-    ? orientation
-    : templates?.[service]?.[template]?.landscape;
+type PdfEntry = {
+  status: string;
+  filepath: string;
 };
 
-export const getViewportConfig = (
-  templateConfig: { service: ServiceNames; template: string },
-  orientation?: boolean
-) => {
-  return {
-    browserMargins: getBrowserMargins(
-      templateConfig.service,
-      templateConfig.service
-    ),
-    landscape: isLandscape(
-      templateConfig.service,
-      templateConfig.template,
-      orientation
-    ),
-  };
-};
+class PdfCache {
+  private static instance: PdfCache;
+  private data: PdfStatus;
+
+  private constructor() {
+    this.data = {};
+  }
+
+  public static getInstance(): PdfCache {
+    if (!PdfCache.instance) {
+      PdfCache.instance = new PdfCache();
+    }
+    return PdfCache.instance;
+  }
+
+  public setItem(id: string, status: PdfEntry): void {
+    this.data[id] = { ...status };
+  }
+
+  public getItem(id: string): PdfEntry {
+    return this.data[id];
+  }
+
+  public deleteItem(id: string) {
+    delete this.data[id];
+  }
+}
+
+export default PdfCache;

@@ -11,7 +11,6 @@ const identityMiddleware: Handler = (req, _res, next) => {
       const identityObject = JSON.parse(
         Buffer.from(rhIdentity as string, 'base64').toString()
       );
-      apiLogger.debug(`Identity Header: ${JSON.stringify(identityObject)}`);
       // We are using ACCOUNT_ID here because it matches the window's auth shape.
       // The API Token uses `identity.user.user_id` and corresponds to `internal.account_id`
       // in the window.
@@ -19,6 +18,10 @@ const identityMiddleware: Handler = (req, _res, next) => {
       httpContext.set(config?.IDENTITY_HEADER_KEY, rhIdentity);
       httpContext.set(config?.IDENTITY_CONTEXT_KEY, identityObject);
       httpContext.set(config?.ACCOUNT_ID, accountID);
+      httpContext.set(
+        config?.AUTHORIZATION_CONTEXT_KEY,
+        req.header(config?.AUTHORIZATION_HEADER_KEY)
+      );
     }
     next();
   } catch (error) {

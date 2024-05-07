@@ -1,29 +1,22 @@
 import puppeteer from 'puppeteer';
 import {
   CHROMIUM_PATH,
-  getViewportConfig,
   pageHeight,
   pageWidth,
   setWindowProperty,
 } from './helpers';
 import config from '../common/config';
-import renderTemplate, {
-  getHeaderAndFooterTemplates,
-} from '../server/render-template';
-import { TemplateConfig } from '../common/types';
+import { getHeaderAndFooterTemplates } from '../server/render-template';
 import { apiLogger } from '../common/logging';
 
-const previewPdf = async (
-  url: string,
-  templateConfig: TemplateConfig,
-  templateData: Record<string, unknown>,
-  orientationOption?: boolean
-) => {
+function delay(time: number) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, time);
+  });
+}
+
+const previewPdf = async (url: string) => {
   const createBuffer = async () => {
-    const { browserMargins, landscape } = getViewportConfig(
-      templateConfig,
-      orientationOption
-    );
     const browser = await puppeteer.launch({
       headless: true,
       ...(config?.IS_PRODUCTION
@@ -35,15 +28,20 @@ const previewPdf = async (
       args: ['--no-sandbox', '--disable-gpu'],
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: pageWidth, height: pageHeight });
-    await page.setContent(renderTemplate(templateConfig, templateData));
 
-    // // Enables console logging in Headless mode - handy for debugging components
+    // Enables console logging in Headless mode - handy for debugging components
     page.on('console', (msg) =>
       apiLogger.debug(`[Headless log] ${msg.text()}`)
     );
-    const { headerTemplate, footerTemplate } =
-      getHeaderAndFooterTemplates(templateConfig);
+    await page.setViewport({ width: pageWidth, height: pageHeight });
+
+    const pageStatus = await page.goto(url, {
+      waitUntil: 'networkidle2',
+    });
+
+    await delay(1000);
+    await page.waitForNetworkIdle();
+    const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     await setWindowProperty(
       page,
@@ -56,16 +54,16 @@ const previewPdf = async (
       })
     );
 
-    const pageStatus = await page.goto(url, { waitUntil: 'networkidle2' });
-
     const pdfBuffer = await page.pdf({
       format: 'a4',
       printBackground: true,
-      margin: browserMargins,
       displayHeaderFooter: true,
       headerTemplate,
       footerTemplate,
-      landscape,
+      margin: {
+        top: '54px',
+        bottom: '54px',
+      },
     });
 
     if (!pageStatus?.ok()) {

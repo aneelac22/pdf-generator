@@ -1,3 +1,10 @@
+enum PdfStatus {
+  Generating = 'Generating',
+  Generated = 'Generated',
+  Failed = 'Failed',
+  NotFound = 'NotFound',
+}
+
 export type PdfEntry = {
   status: string;
   filepath: string;
@@ -8,9 +15,11 @@ export type PdfCollection = {
 };
 export type PDFComponentGroup = {
   components: PDFComponent[];
+  // TODO: Change to enum
   status: string;
 };
 export type PDFComponent = {
+  // TODO: Change to enum
   status: string;
   filepath: string;
   collectionId: string;
@@ -54,9 +63,19 @@ class PdfCache {
   }
 
   public addToCollection(collectionId: string, status: PDFComponent): void {
-    if (!this.data[collectionId]) {
-      this.data[collectionId] = { components: [], status: 'Generating' };
+    const currentEntry = this.data[collectionId];
+    if (!currentEntry) {
+      this.data[collectionId] = {
+        components: [],
+        status: PdfStatus.Generating,
+      };
     }
+    // replace
+    this.data[collectionId].components = this.data[
+      collectionId
+    ].components.filter(
+      ({ componentId }) => componentId !== status.componentId
+    );
     this.data[collectionId].components.push(status);
   }
 
@@ -66,6 +85,22 @@ class PdfCache {
 
   public deleteCollection(id: string) {
     delete this.data[id];
+  }
+
+  public verifyCollection(collectionId: string): void {
+    if (!this.data[collectionId]) {
+      throw new Error('Collection not found');
+    }
+
+    this.data[collectionId].components = this.data[collectionId].components.map(
+      (component) => {
+        return {
+          ...component,
+          status: PdfStatus.Generated,
+        };
+      }
+    );
+    this.data[collectionId].status = PdfStatus.Generated;
   }
 
   public isComplete(id: string): boolean {

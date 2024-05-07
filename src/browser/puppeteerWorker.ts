@@ -1,14 +1,11 @@
-import WP from 'workerpool';
-import puppeteer from 'puppeteer';
-import { HTTPRequest } from 'puppeteer';
-import { v4 as uuidv4 } from 'uuid';
+import puppeteer, { HTTPRequest } from 'puppeteer';
 import os from 'os';
 import fs from 'fs';
+import crypto from 'crypto';
 import { PdfRequestBody } from '../common/types';
 import { apiLogger } from '../common/logging';
 import {
   CHROMIUM_PATH,
-  getViewportConfig,
   pageHeight,
   pageWidth,
   setWindowProperty,
@@ -17,7 +14,7 @@ import { getHeaderAndFooterTemplates } from '../server/render-template';
 import config from '../common/config';
 
 // Match the timeout on the gateway
-const BROWSER_TIMEOUT = 60_000;
+const BROWSER_TIMEOUT = 600_000;
 
 const redirectFontFiles = async (request: HTTPRequest) => {
   if (request.url().endsWith('.woff') || request.url().endsWith('.woff2')) {
@@ -27,7 +24,7 @@ const redirectFontFiles = async (request: HTTPRequest) => {
       if (err) {
         await request.respond({
           status: 404,
-          body: `An error occurred while loading font ${modifiedUrl} : ${err}`,
+          body: `An error occurred while loading font ${modifiedUrl} : ${err.message}`,
         });
       }
       await request.respond({
@@ -41,18 +38,12 @@ const redirectFontFiles = async (request: HTTPRequest) => {
 };
 
 const getNewPdfName = () => {
-  const pdfFilename = `report_${uuidv4()}.pdf`;
+  const pdfFilename = `report_${crypto.randomUUID()}.pdf`;
   return `${os.tmpdir()}/${pdfFilename}`;
 };
 
-const generatePdf = async ({
-  url,
-  rhIdentity,
-  templateConfig,
-  orientationOption,
-  dataOptions,
-  uuid,
-}: PdfRequestBody) => {
+const generatePdf = async (data: PdfRequestBody) => {
+  const { url, identity, uuid, fetchDataParams } = data;
   const pdfPath = getNewPdfName();
   const createFilename = async () => {
     apiLogger.debug(uuid);
@@ -78,7 +69,6 @@ const generatePdf = async ({
         '--user-data-dir=/tmp/',
       ],
     });
-    // }
 
     const page = await browser.newPage();
     await page.setUserAgent(
@@ -101,17 +91,16 @@ const generatePdf = async ({
       })
       // }) as undefined // probably a typings issue in puppeteer
     );
-
     await page.setExtraHTTPHeaders({
-      ...(dataOptions
+      ...(fetchDataParams
         ? {
-            [config?.OPTIONS_HEADER_NAME]: JSON.stringify(dataOptions),
+            [config?.OPTIONS_HEADER_NAME]: JSON.stringify(fetchDataParams),
           }
         : {}),
 
-      ...(config?.IS_DEVELOPMENT && !rhIdentity
+      ...(config?.IS_DEVELOPMENT || !identity
         ? {}
-        : { 'x-rh-identity': rhIdentity }),
+        : { 'x-rh-identity': identity }),
     });
 
     // Intercept font requests from chrome and send them from dist
@@ -134,6 +123,7 @@ const generatePdf = async ({
 
     // error happened during page rendering
     if (error && error.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let response: any;
       try {
         // error should be JSON
@@ -146,31 +136,29 @@ const generatePdf = async ({
       }
       throw new Error(`Page render error: ${response}`);
     }
-    if (!pageStatus?.ok()) {
+
+    if (!pageStatus?.ok() && pageStatus?.statusText() !== 'Not Modified') {
       apiLogger.debug(`Page status: ${pageStatus?.statusText()}`);
       throw new Error(
         `Puppeteer error while loading the react app: ${pageStatus?.statusText()}`
       );
     }
-    const { browserMargins, landscape } = getViewportConfig(
-      templateConfig,
-      orientationOption
-    );
 
-    const { headerTemplate, footerTemplate } =
-      getHeaderAndFooterTemplates(templateConfig);
+    const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
 
     try {
       await page.pdf({
         path: pdfPath,
         format: 'a4',
         printBackground: true,
-        margin: browserMargins,
         displayHeaderFooter: true,
         headerTemplate,
         footerTemplate,
-        landscape,
         timeout: BROWSER_TIMEOUT,
+        margin: {
+          top: '54px',
+          bottom: '54px',
+        },
       });
     } catch (error: unknown) {
       throw new Error(`Failed to print pdf: ${JSON.stringify(error)}`);

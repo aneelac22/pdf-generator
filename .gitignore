@@ -21,6 +21,7 @@ public/*
 **/.DS_Store
 .DS_Store
 .vscode
+.nx
 
 # Snyk
 .dccache

@@ -1,25 +1,14 @@
-import React from 'react';
 import fs from 'fs';
 import path from 'path';
+import { GeneratePayload } from '../../common/types';
+import { renderToStaticMarkup } from 'react-dom/server';
+import Header from './Header';
+import Footer from './Footer';
 
-import templateMapper from '../../templates';
-import ServiceNames from '../../common/service-names';
-import { renderToString, renderToStaticMarkup } from 'react-dom/server';
-import CSSRoot from './CSSRoot';
-
-export function getHeaderAndFooterTemplates({
-  service,
-  template,
-}: {
-  service: ServiceNames;
-  template: string;
-}): {
+export function getHeaderAndFooterTemplates(): {
   headerTemplate: string;
   footerTemplate: string;
 } {
-  const { header: HeaderTemplateNode, footer: FooterTemplateNode } =
-    templateMapper?.[service]?.[template] || {};
-
   const root = process.cwd();
   const headerBase = fs.readFileSync(
     path.resolve(root, 'public/templates/header-template.html'),
@@ -34,44 +23,31 @@ export function getHeaderAndFooterTemplates({
   return {
     headerTemplate: headerBase.replace(
       '<div id="content"></div>',
-      renderToStaticMarkup(<HeaderTemplateNode />)
+      renderToStaticMarkup(<Header />)
     ),
     footerTemplate: footerBase.replace(
       '<div id="content"></div>',
-      renderToStaticMarkup(<FooterTemplateNode />)
+      renderToStaticMarkup(<Footer />)
     ),
   };
 }
 
-function renderTemplate(
-  templateConfig: {
-    service: ServiceNames;
-    template: string;
-  },
-  templateData: Record<string, unknown>
-) {
-  const Node: React.ComponentType<any> =
-    templateMapper?.[templateConfig.service]?.[templateConfig.template]
-      .template;
-  if (typeof Node === 'undefined') {
-    throw `Template not found, invalid query: ${templateConfig.service}: ${templateConfig.template}!`;
-  }
-
+function renderTemplate(payload: GeneratePayload) {
   const root = process.cwd();
   const baseTemplate = fs.readFileSync(
-    path.resolve(root, 'public/templates/base-template.html'),
+    path.resolve(root, 'dist/public/index.html'),
     { encoding: 'utf-8' }
   );
 
   const template = baseTemplate.replace(
-    '<div id="root"></div>',
-    `<div id="root">${renderToString(
-      <>
-        <CSSRoot />
-        <Node {...templateData} />
-      </>
-    )}</div>`
+    '<script id="initial-state"></script>',
+    `<script id="initial-state">window.__initialState__ = ${JSON.stringify(
+      payload,
+      null,
+      2
+    )}</script>`
   );
+
   return template;
 }
 
