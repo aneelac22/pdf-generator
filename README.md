@@ -21,7 +21,7 @@ oc port-forward -n crc-pdf-generator svc/crc-pdf-generator-api 8000:8000
 
 ## Service Integration
 
-Please follow the [Integration guide](./INTEGRATION.md). 
+~~Please follow the [Integration guide](./INTEGRATION.md).~~
 
 ## Endpoints
 You currently have 2 choices for generating any of the available templates:
