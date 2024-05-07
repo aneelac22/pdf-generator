@@ -52,6 +52,10 @@ objects:
           value: ${COMPLIANCE_API_SCHEME}://${COMPLIANCE_HOST}:${COMPLIANCE_API_PORT}
         - name: LOG_LEVEL
           value: ${LOG_LEVEL}
+        - name: ASSETS_HOST
+          value: ${ASSETS_HOST}
+        - name: API_HOST
+          value: ${API_HOST}
         resources:
           limits:
             cpu: ${CPU_LIMIT}
