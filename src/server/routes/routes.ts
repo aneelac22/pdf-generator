@@ -49,6 +49,17 @@ function addProxy(req: GenerateHandlerRequest) {
       target: config.scalprum.assetsHost,
       changeOrigin: true,
       pathFilter: (path) => path.startsWith('/apps'),
+      preserveHeaderKeyCase: true,
+      on: {
+        proxyReq: (req) => {
+          // set AUTH header for gateway
+          req.setHeader(
+            config.AUTHORIZATION_HEADER_KEY,
+            req.getHeader(config.AUTHORIZATION_CONTEXT_KEY) as string
+          );
+          req.removeHeader(config?.AUTHORIZATION_CONTEXT_KEY);
+        },
+      },
       logger: apiLogger,
     });
     const apiProxy = createProxyMiddleware({
