@@ -77,7 +77,7 @@ export const generatePdf = async (
       );
 
       const extraHeaders: Record<string, string> = {};
-      if (config?.IS_DEVELOPMENT && !identity) {
+      if (identity) {
         extraHeaders['x-rh-identity'] = identity;
       }
 
