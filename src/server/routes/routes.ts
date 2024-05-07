@@ -52,12 +52,15 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (req) => {
+          const identityHeader = req.getHeader(config.IDENTITY_CONTEXT_KEY);
+          apiLogger.debug(`Identity header: ${identityHeader}`);
+          const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          apiLogger.debug(`Auth header: ${authHeader}`);
+          if (authHeader) {
+            req.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
+          }
           // set AUTH header for gateway
-          req.setHeader(
-            config.AUTHORIZATION_HEADER_KEY,
-            req.getHeader(config.AUTHORIZATION_CONTEXT_KEY) as string
-          );
-          req.removeHeader(config?.AUTHORIZATION_CONTEXT_KEY);
+          req.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
       logger: apiLogger,
@@ -70,12 +73,12 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (req) => {
+          const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
+          if (authHeader) {
+            req.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
+          }
           // set AUTH header for gateway
-          req.setHeader(
-            config.AUTHORIZATION_HEADER_KEY,
-            req.getHeader(config.AUTHORIZATION_CONTEXT_KEY) as string
-          );
-          req.removeHeader(config?.AUTHORIZATION_CONTEXT_KEY);
+          req.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
       logger: apiLogger,
