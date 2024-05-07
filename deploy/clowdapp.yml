@@ -105,3 +105,9 @@ parameters:
 - description: Enable large test queries
   name: QUERY_LARGE_DATASET
   value: "false"
+- description: Scalprum template ASSETS host
+  name: ASSETS_HOST
+  value: "blank"
+- description: Scalprum template API host
+  name: API_HOST
+  value: "blank"
