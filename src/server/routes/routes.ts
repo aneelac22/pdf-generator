@@ -18,7 +18,6 @@ import {
 } from '../../common/types';
 import { apiLogger } from '../../common/logging';
 import { downloadPDF } from '../../common/objectStore';
-import { Readable } from 'stream';
 import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
@@ -52,7 +51,8 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (req) => {
-          const identityHeader = req.getHeader(config.IDENTITY_CONTEXT_KEY);
+          req.setHeader('origin', config.scalprum.assetsHost);
+          const identityHeader = req.getHeader(config.IDENTITY_HEADER_KEY);
           apiLogger.debug(`Identity header: ${identityHeader}`);
           const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
           apiLogger.debug(`Auth header: ${authHeader}`);
@@ -73,6 +73,7 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (req) => {
+          req.setHeader('origin', config.scalprum.apiHost);
           const authHeader = req.getHeader(config.AUTHORIZATION_CONTEXT_KEY);
           if (authHeader) {
             req.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
@@ -168,7 +169,9 @@ router.post(
         if (configHeaders) {
           delete req.headers[config?.OPTIONS_HEADER_NAME];
         }
-        apiLogger.debug(`Single call to generator queued for ${collectionId}`);
+        apiLogger.debug(
+          `Single call to generator queued for ${collectionId}, header: ${pdfDetails.identity}`
+        );
         await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
           status: 'Generating',

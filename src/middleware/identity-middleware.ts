@@ -6,10 +6,11 @@ import config from '../common/config';
 
 const identityMiddleware: Handler = (req, _res, next) => {
   try {
-    const rhIdentity = req.headers[config?.IDENTITY_HEADER_KEY];
+    const rhIdentity = req.header(config.IDENTITY_HEADER_KEY);
+    apiLogger.info(`Identity Middleware: ${rhIdentity}`);
     if (rhIdentity) {
       const identityObject = JSON.parse(
-        Buffer.from(rhIdentity as string, 'base64').toString()
+        Buffer.from(rhIdentity, 'base64').toString()
       );
       // We are using ACCOUNT_ID here because it matches the window's auth shape.
       // The API Token uses `identity.user.user_id` and corresponds to `internal.account_id`
