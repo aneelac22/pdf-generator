@@ -33,6 +33,7 @@ const defaultConfig: {
   OPTIONS_HEADER_NAME: string;
   IDENTITY_CONTEXT_KEY: string;
   IDENTITY_HEADER_KEY: string;
+  JWT_COOKIE_NAME: string;
   AUTHORIZATION_HEADER_KEY: string;
   AUTHORIZATION_CONTEXT_KEY: string;
   ACCOUNT_ID: string;
@@ -99,6 +100,7 @@ const defaultConfig: {
   IDENTITY_HEADER_KEY: 'x-rh-identity',
   AUTHORIZATION_HEADER_KEY: 'Authorization',
   AUTHORIZATION_CONTEXT_KEY: 'x-pdf-auth',
+  JWT_COOKIE_NAME: 'cs_jwt',
   ACCOUNT_ID: '',
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   scalprum: {

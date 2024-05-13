@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import promBundle from 'express-prom-bundle';
 import httpContext from 'express-http-context';
@@ -17,8 +18,10 @@ const app = express();
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.resolve(__dirname, '..', 'build')));
 app.use(express.static(path.resolve(__dirname, '../public')));
+app.use(cookieParser());
 app.use(httpContext.middleware);
-app.use(identityMiddleware);
+app.use(`${config?.APIPrefix}/v2/create`, identityMiddleware);
+app.use('/preview', identityMiddleware);
 app.use(requestLogger);
 router.use('/public', express.static(path.resolve(__dirname, './public')));
 app.use('/', router);
