@@ -22,7 +22,10 @@ import { downloadPDF } from '../../common/objectStore';
 import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import {
+  createProxyMiddleware,
+  responseInterceptor,
+} from 'http-proxy-middleware';
 
 const router = Router();
 const pdfCache = PdfCache.getInstance();
@@ -52,13 +55,17 @@ function addProxy(req: GenerateHandlerRequest) {
       preserveHeaderKeyCase: true,
       secure: false,
       autoRewrite: true,
+      selfHandleResponse: true,
       headers: {
         origin: config.scalprum.assetsHost.replace('https://', ''),
       },
       on: {
         proxyReq: (proxyReq, req) => {
           req.headers['host'] = config.scalprum.assetsHost;
-          proxyReq.setHeader('origin', config.scalprum.assetsHost);
+          proxyReq.setHeader(
+            'origin',
+            config.scalprum.assetsHost.replace('https://', '')
+          );
           const authHeader = proxyReq.getHeader(
             config.AUTHORIZATION_CONTEXT_KEY
           );
@@ -74,9 +81,11 @@ function addProxy(req: GenerateHandlerRequest) {
           // set AUTH header for gateway
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
-        proxyRes: (proxyRes) => {
-          console.log('ASSETS\n', proxyRes);
-        },
+        proxyRes: responseInterceptor(async (responseBuffer) => {
+          const response = responseBuffer.toString('utf8');
+          console.log('ASSETS\n', response);
+          return responseBuffer;
+        }),
       },
       logger: apiLogger,
     });
@@ -94,7 +103,10 @@ function addProxy(req: GenerateHandlerRequest) {
       on: {
         proxyReq: (proxyReq) => {
           req.headers['host'] = config.scalprum.apiHost;
-          proxyReq.setHeader('origin', config.scalprum.apiHost);
+          proxyReq.setHeader(
+            'origin',
+            config.scalprum.apiHost.replace('https://', '')
+          );
           const authHeader = proxyReq.getHeader(
             config.AUTHORIZATION_CONTEXT_KEY
           );
