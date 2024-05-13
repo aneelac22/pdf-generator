@@ -18,9 +18,17 @@ const identityMiddleware: Handler = (req, _res, next) => {
       httpContext.set(config?.IDENTITY_HEADER_KEY, rhIdentity);
       httpContext.set(config?.IDENTITY_CONTEXT_KEY, identityObject);
       httpContext.set(config?.ACCOUNT_ID, accountID);
+    }
+    if (req.header(config.AUTHORIZATION_HEADER_KEY)) {
       httpContext.set(
-        config?.AUTHORIZATION_CONTEXT_KEY,
-        req.header(config?.AUTHORIZATION_HEADER_KEY)
+        config.AUTHORIZATION_CONTEXT_KEY,
+        req.header(config.AUTHORIZATION_HEADER_KEY)
+      );
+    }
+    if (req.cookies[config.JWT_COOKIE_NAME]) {
+      httpContext.set(
+        config.JWT_COOKIE_NAME,
+        req.cookies[config.JWT_COOKIE_NAME]
       );
     }
     next();

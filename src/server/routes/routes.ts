@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
+import 'dotenv/config';
 import fs from 'fs';
 import crypto from 'crypto';
 import PdfCache from '../../common/pdfCache';
@@ -58,12 +59,9 @@ function addProxy(req: GenerateHandlerRequest) {
         proxyReq: (proxyReq, req) => {
           req.headers['host'] = config.scalprum.assetsHost;
           proxyReq.setHeader('origin', config.scalprum.assetsHost);
-          const identityHeader = proxyReq.getHeader(config.IDENTITY_HEADER_KEY);
-          apiLogger.debug(`Identity header: ${identityHeader}`);
           const authHeader = proxyReq.getHeader(
             config.AUTHORIZATION_CONTEXT_KEY
           );
-          apiLogger.debug(`Auth header: ${authHeader}`);
           if (authHeader) {
             proxyReq.setHeader(config.AUTHORIZATION_HEADER_KEY, authHeader);
           }
@@ -75,7 +73,6 @@ function addProxy(req: GenerateHandlerRequest) {
           );
           // set AUTH header for gateway
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
-          console.log(proxyReq.getHeaders());
         },
       },
       logger: apiLogger,
@@ -136,10 +133,14 @@ function getPdfRequestBody(payload: GeneratePayload): PdfRequestBody {
       JSON.stringify(fetchDataParams)
     );
   }
+
   return {
     ...payload,
-    authHeader: httpContext.get(config.AUTHORIZATION_CONTEXT_KEY) as string,
-    identity: httpContext.get(config?.IDENTITY_HEADER_KEY) as string,
+    authCookie: httpContext.get(config.JWT_COOKIE_NAME),
+    authHeader:
+      httpContext.get(config.AUTHORIZATION_CONTEXT_KEY) ||
+      process.env.MOCK_TOKEN,
+    identity: httpContext.get(config?.IDENTITY_HEADER_KEY),
     uuid,
     url: requestURL.toString(),
   };

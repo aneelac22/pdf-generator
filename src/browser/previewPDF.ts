@@ -34,6 +34,12 @@ const previewPdf = async (url: string) => {
       apiLogger.debug(`[Headless log] ${msg.text()}`)
     );
     await page.setViewport({ width: pageWidth, height: pageHeight });
+    const extraHeaders: Record<string, string> = {};
+    if (process.env.MOCK_TOKEN) {
+      extraHeaders['Authorization'] = process.env.MOCK_TOKEN;
+    }
+    await page.setCookie({ name: 'cs_jwt', value: 'bar', domain: 'localhost' });
+    await page.setExtraHTTPHeaders(extraHeaders);
 
     const pageStatus = await page.goto(url, {
       waitUntil: 'networkidle2',

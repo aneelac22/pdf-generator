@@ -48,6 +48,7 @@ export const generatePdf = async (
     fetchDataParams,
     uuid: componentId,
     authHeader,
+    authCookie,
   }: PdfRequestBody,
   collectionId: string
 ): Promise<string> => {
@@ -88,6 +89,15 @@ export const generatePdf = async (
 
       if (authHeader) {
         extraHeaders[config.AUTHORIZATION_CONTEXT_KEY] = authHeader;
+      }
+
+      if (authCookie) {
+        await page.setCookie({
+          name: config.JWT_COOKIE_NAME,
+          value: authCookie,
+          // We might have to change the domain to match the proxy
+          domain: 'localhost',
+        });
       }
 
       await page.setExtraHTTPHeaders(extraHeaders);
