@@ -55,10 +55,6 @@ export const generatePdf = async (
   const pdfPath = getNewPdfName(componentId);
   const createFilename = async (): Promise<string> => {
     await cluster.queue(async ({ page }: { page: Page }) => {
-      await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36'
-      );
-
       await page.setViewport({ width: pageWidth, height: pageHeight });
 
       // Enables console logging in Headless mode - handy for debugging components

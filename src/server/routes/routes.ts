@@ -53,7 +53,7 @@ function addProxy(req: GenerateHandlerRequest) {
       secure: false,
       autoRewrite: true,
       headers: {
-        origin: config.scalprum.assetsHost,
+        origin: config.scalprum.assetsHost.replace('https://', ''),
       },
       on: {
         proxyReq: (proxyReq, req) => {
@@ -74,6 +74,9 @@ function addProxy(req: GenerateHandlerRequest) {
           // set AUTH header for gateway
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
+        proxyRes: (proxyRes) => {
+          console.log('ASSETS\n', proxyRes);
+        },
       },
       logger: apiLogger,
     });
@@ -83,7 +86,7 @@ function addProxy(req: GenerateHandlerRequest) {
       secure: false,
       autoRewrite: true,
       headers: {
-        origin: config.scalprum.assetsHost,
+        origin: config.scalprum.assetsHost.replace('https://', ''),
       },
       pathFilter: (path) =>
         path.startsWith('/api') && !path.includes('crc-pdf-generator'),
@@ -106,6 +109,9 @@ function addProxy(req: GenerateHandlerRequest) {
           );
 
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
+        },
+        proxyRes: (proxyRes) => {
+          console.log('API\n', proxyRes);
         },
       },
       logger: apiLogger,
