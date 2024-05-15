@@ -7,6 +7,7 @@ import PdfCache from '../../common/pdfCache';
 import { PdfGenerationError } from '../errors';
 import { Router, Request } from 'express';
 import httpContext from 'express-http-context';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import renderTemplate from '../render-template';
 import config from '../../common/config';
 import previewPdf from '../../browser/previewPDF';
@@ -48,6 +49,10 @@ function addProxy(req: GenerateHandlerRequest) {
         `The variable assetsHost is not in config! Falling back to request origin host: ${assetsHost}`
       );
     }
+    let agent: HttpsProxyAgent<string> | undefined;
+    if (config.scalprum.proxyAgent) {
+      agent = new HttpsProxyAgent(config.scalprum.proxyAgent);
+    }
     const assetsProxy = createProxyMiddleware({
       target: config.scalprum.assetsHost,
       changeOrigin: true,
@@ -56,16 +61,11 @@ function addProxy(req: GenerateHandlerRequest) {
       secure: false,
       autoRewrite: true,
       selfHandleResponse: true,
-      headers: {
-        origin: config.scalprum.assetsHost.replace('https://', ''),
-      },
+      agent: agent,
       on: {
         proxyReq: (proxyReq, req) => {
           req.headers['host'] = config.scalprum.assetsHost;
-          proxyReq.setHeader(
-            'origin',
-            config.scalprum.assetsHost.replace('https://', '')
-          );
+          proxyReq.setHeader('origin', config.scalprum.assetsHost);
           const authHeader = proxyReq.getHeader(
             config.AUTHORIZATION_CONTEXT_KEY
           );
@@ -94,19 +94,14 @@ function addProxy(req: GenerateHandlerRequest) {
       changeOrigin: true,
       secure: false,
       autoRewrite: true,
-      headers: {
-        origin: config.scalprum.assetsHost.replace('https://', ''),
-      },
+      agent,
       pathFilter: (path) =>
         path.startsWith('/api') && !path.includes('crc-pdf-generator'),
       preserveHeaderKeyCase: true,
       on: {
         proxyReq: (proxyReq) => {
           req.headers['host'] = config.scalprum.apiHost;
-          proxyReq.setHeader(
-            'origin',
-            config.scalprum.apiHost.replace('https://', '')
-          );
+          proxyReq.setHeader('origin', config.scalprum.apiHost);
           const authHeader = proxyReq.getHeader(
             config.AUTHORIZATION_CONTEXT_KEY
           );
@@ -122,9 +117,11 @@ function addProxy(req: GenerateHandlerRequest) {
 
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
-        proxyRes: (proxyRes) => {
-          console.log('API\n', proxyRes);
-        },
+        proxyRes: responseInterceptor(async (responseBuffer) => {
+          const response = responseBuffer.toString('utf8');
+          console.log('API\n', response);
+          return responseBuffer;
+        }),
       },
       logger: apiLogger,
     });

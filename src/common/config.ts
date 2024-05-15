@@ -43,6 +43,8 @@ const defaultConfig: {
     apiHost: string;
     // for proxy request to /apps
     assetsHost: string;
+    // request proxy agent
+    proxyAgent?: string;
   };
 } = {
   webPort: 8000,
@@ -106,6 +108,12 @@ const defaultConfig: {
   scalprum: {
     apiHost: process.env.API_HOST || 'blank',
     assetsHost: process.env.ASSETS_HOST || 'blank',
+    proxyAgent:
+      process.env.PROXY_AGENT &&
+      process.env.PROXY_AGENT.length > 0 &&
+      process.env.PROXY_AGENT !== 'blank'
+        ? process.env.PROXY_AGENT
+        : undefined,
   },
 };
 

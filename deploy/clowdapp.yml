@@ -56,6 +56,8 @@ objects:
           value: ${ASSETS_HOST}
         - name: API_HOST
           value: ${API_HOST}
+        - name: PROXY_AGENT
+          value: ${PROXY_AGENT}
         resources:
           limits:
             cpu: ${CPU_LIMIT}
@@ -114,4 +116,7 @@ parameters:
   value: "blank"
 - description: Scalprum template API host
   name: API_HOST
+  value: "blank"
+- description: Proxy agent
+  name: PROXY_AGENT
   value: "blank"
