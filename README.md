@@ -71,10 +71,18 @@ fetch('/api/crc-pdf-generator/v2/create', {
   },
 
   body: JSON.stringify({
-      // service and template params are mandatory
-      service: 'ros',
-      template: 'systemsReport',
-      // ... any other config options accepted by your template
+      "payload": [
+        {
+          "manifestLocation": "/apps/landing/fed-mods.json",
+          "scope": "landing",
+          "module": "./PdfEntry"
+        },
+        {
+          "manifestLocation": "/apps/landing/fed-mods.json",
+          "scope": "landing",
+          "module": "./PdfEntry"
+        }
+	    ]
     }),
   })
   .then(async (response) => {
@@ -86,7 +94,24 @@ fetch('/api/crc-pdf-generator/v2/create', {
 Grab the statusID from the response and add it to the status call
 
 ``` js
-fetch('/api/crc-pdf-generator/v2/download/b5b36108-b03f-4c3d-a1a9-8ccf3a922b20', {
+fetch('/api/crc-pdf-generator/v2/status/19f76eab-e3c0-482e-8a66-f02fcb28057f', {
+  headers: {
+    // do not forget the content type header!
+    'Content-Type': 'application/json',
+  }
+  
+  })
+  .then(async (response) => {
+    const res = await response.json();
+		console.log(res);
+  })
+
+```
+
+Download the PDF
+
+``` js
+fetch('/api/crc-pdf-generator/v2/download/19f76eab-e3c0-482e-8a66-f02fcb28057f', {
   headers: {
     // do not forget the content type header!
     'Content-Type': 'application/json',
