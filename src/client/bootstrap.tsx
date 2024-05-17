@@ -34,15 +34,14 @@ type CreateAxiosRequest = (
 
 function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
   if (window.IS_PRODUCTION && !window.__endpoints__[service]) {
-    const message = `Service ${service} not found! Available services: ${Object.keys(
+    const message = `createAxiosRequest: Service ${service} not found! Available services: ${Object.keys(
       window.__endpoints__
     ).join(', ')}.\n You might need to add service integration in the config.`;
-    console.error(message);
     throw new Error(message);
   }
 
   if (!config.url) {
-    throw new Error('URL is required');
+    throw new Error('createAxiosRequest: URL is required!');
   }
   config.url = `/internal/${service}${config.url}`;
   return axios(config)
@@ -60,6 +59,28 @@ type AsyncState = {
   error: unknown;
   data: unknown;
 };
+
+function FetchErrorFallback({ error }: { error?: unknown }) {
+  let content = null;
+  try {
+    if (error instanceof Error) {
+      content = <div>{error.message}</div>;
+    } else if (typeof error === 'string') {
+      content = <div>{error}</div>;
+    } else if (
+      typeof error === 'object' &&
+      error !== null &&
+      typeof (error as any).message === 'string'
+    ) {
+      content = <div>{(error as any).message}</div>;
+    } else {
+      content = <div>{JSON.stringify(error, null, 2)}</div>;
+    }
+  } catch {
+    content = <div>Something went wrong</div>;
+  }
+  return <div id="crc-pdf-generator-err">{content}</div>;
+}
 
 const MetadataWrapper = () => {
   const [asyncState, setAsyncState] = useState<AsyncState>({
@@ -88,31 +109,34 @@ const MetadataWrapper = () => {
   useEffect(() => {
     getFetchMetadata();
   }, []);
+
+  const { error, loading, data } = asyncState;
+  if (error) {
+    return <FetchErrorFallback error={error} />;
+  }
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   const props: ScalprumComponentProps<
     Record<string, any>,
-    { asyncData: AsyncState }
+    { asyncData: { data: unknown } }
   > = {
-    asyncData: asyncState,
+    asyncData: { data },
     scope: state.scope,
     module: state.module,
     importName: state.importName,
+    ErrorComponent: <FetchErrorFallback />,
   };
   return <ScalprumComponent {...props} />;
 };
 
 const App = () => {
   return (
-    <div>
-      <ScalprumProvider pluginSDKOptions={{}} config={config}>
-        <div>
-          <h1>Hello World</h1>
-        </div>
-        <div>
-          <pre>{JSON.stringify(window.__initialState__, null, 2)}</pre>
-        </div>
-        <MetadataWrapper />
-      </ScalprumProvider>
-    </div>
+    <ScalprumProvider config={config}>
+      <MetadataWrapper />
+    </ScalprumProvider>
   );
 };
 

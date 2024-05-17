@@ -3,7 +3,7 @@ import fs from 'fs';
 import { PdfRequestBody } from '../common/types';
 import { apiLogger } from '../common/logging';
 import { pageHeight, pageWidth, setWindowProperty } from './helpers';
-import PdfCache from '../common/pdfCache';
+import PdfCache, { PdfStatus } from '../common/pdfCache';
 import { getHeaderAndFooterTemplates } from '../server/render-template';
 import config from '../common/config';
 import { uploadPDF } from '../common/objectStore';
@@ -118,7 +118,7 @@ export const generatePdf = async (
 
       // get the error from DOM if it exists
       const error = await page.evaluate(() => {
-        const elem = document.getElementById('report-error');
+        const elem = document.getElementById('crc-pdf-generator-err');
         if (elem) {
           return elem.innerText;
         }
@@ -139,11 +139,13 @@ export const generatePdf = async (
         }
         const updated = {
           collectionId,
-          status: `Failed: ${response}`,
+          status: PdfStatus.Failed,
           filepath: '',
           componentId: componentId,
+          error: response,
         };
         UpdateStatus(updated);
+        PdfCache.getInstance().invalidateCollection(collectionId, response);
         throw new PdfGenerationError(
           collectionId,
           componentId,
@@ -154,11 +156,16 @@ export const generatePdf = async (
         apiLogger.debug(`Page status: ${pageResponse?.statusText()}`);
         const updated = {
           collectionId,
-          status: `Failed: ${pageResponse?.statusText()}`,
+          status: PdfStatus.Failed,
           filepath: '',
           componentId: componentId,
+          error: pageResponse?.statusText() || 'Page status not found',
         };
         UpdateStatus(updated);
+        PdfCache.getInstance().invalidateCollection(
+          collectionId,
+          pageResponse?.statusText() || 'Page status not found'
+        );
         throw new PdfGenerationError(
           collectionId,
           componentId,
@@ -187,7 +194,7 @@ export const generatePdf = async (
         });
         const updated = {
           collectionId,
-          status: 'Generated',
+          status: PdfStatus.Generated,
           filepath: pdfPath,
           componentId: componentId,
         };
@@ -196,11 +203,16 @@ export const generatePdf = async (
       } catch (error: unknown) {
         const updated = {
           collectionId,
-          status: `Failed to print pdf: ${JSON.stringify(error)}`,
+          status: PdfStatus.Failed,
           filepath: '',
           componentId: componentId,
+          error: JSON.stringify(error),
         };
         UpdateStatus(updated);
+        PdfCache.getInstance().invalidateCollection(
+          collectionId,
+          JSON.stringify(error)
+        );
         throw new PdfGenerationError(
           collectionId,
           componentId,

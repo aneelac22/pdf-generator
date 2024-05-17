@@ -1,4 +1,4 @@
-enum PdfStatus {
+export enum PdfStatus {
   Generating = 'Generating',
   Generated = 'Generated',
   Failed = 'Failed',
@@ -15,40 +15,19 @@ export type PdfCollection = {
 };
 export type PDFComponentGroup = {
   components: PDFComponent[];
-  // TODO: Change to enum
-  status: string;
+  status: PdfStatus;
+  error?: string;
 };
 export type PDFComponent = {
-  // TODO: Change to enum
-  status: string;
+  status: PdfStatus;
   filepath: string;
   collectionId: string;
   componentId: string;
+  error?: string;
 };
 
 class PdfCache {
   private static instance: PdfCache;
-
-  // Shape example
-  // {
-  //   '1101': {
-  //     'status': "Generating",
-  //     'components': [
-  //       {
-  //         'status': 'Generated',
-  //         'filepath': '/tmp/home',
-  //         'id': '1111',
-  //         'parent': '1111',
-  //       },
-  //       {
-  //         'status': 'Generating',
-  //         'filepath': '/tmp/home',
-  //         'id': "2222"
-  //         'parent': "2222"
-  //       },
-  //     ]
-  //   }
-  // }
   private data: PdfCollection;
 
   private constructor() {
@@ -87,7 +66,11 @@ class PdfCache {
     delete this.data[id];
   }
 
-  public verifyCollection(collectionId: string): void {
+  private updateCollectionState(
+    collectionId: string,
+    status: PdfStatus,
+    error?: string
+  ): void {
     if (!this.data[collectionId]) {
       throw new Error('Collection not found');
     }
@@ -96,15 +79,24 @@ class PdfCache {
       (component) => {
         return {
           ...component,
-          status: PdfStatus.Generated,
+          status,
         };
       }
     );
-    this.data[collectionId].status = PdfStatus.Generated;
+    this.data[collectionId].status = status;
+    this.data[collectionId].error = error;
+  }
+
+  public invalidateCollection(collectionId: string, error: string): void {
+    this.updateCollectionState(collectionId, PdfStatus.Failed, error);
+  }
+
+  public verifyCollection(collectionId: string): void {
+    this.updateCollectionState(collectionId, PdfStatus.Generated);
   }
 
   public isComplete(id: string): boolean {
-    if (this.data[id].status === 'Generated') {
+    if (this.data[id].status === PdfStatus.Generated) {
       return true;
     }
     return false;
