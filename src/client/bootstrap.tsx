@@ -44,18 +44,7 @@ function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
   if (!config.url) {
     throw new Error('URL is required');
   }
-  if (window.IS_PRODUCTION) {
-    try {
-      // This will fail if the URL does not have hostname and protocol
-      new URL(config.url);
-    } catch (error) {
-      config.url = `/internal/${service}${config.url}`;
-    }
-  }
-  if (!config.headers) {
-    config.headers = {};
-  }
-  console.log(config.url);
+  config.url = `/internal/${service}${config.url}`;
   return axios(config)
     .then((response: AxiosResponse) => response.data)
     .catch((error) => {
