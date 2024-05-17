@@ -141,9 +141,11 @@ const defaultConfig: {
 function initializeConfig() {
   let isClowderEnabled = false;
   const endpoints: Partial<ServicesEndpoints> = {};
+
   try {
     let config: typeof defaultConfig = {
       ...defaultConfig,
+      endpoints,
     };
     const clowder: Config = new Config();
     isClowderEnabled = IsClowderEnabled();

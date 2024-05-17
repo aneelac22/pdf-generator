@@ -45,24 +45,17 @@ function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
     throw new Error('URL is required');
   }
   if (window.IS_PRODUCTION) {
-    const endpoint = window.__endpoints__[service]!;
-    const { hostname, port } = endpoint ?? {};
     try {
       // This will fail if the URL does not have hostname and protocol
       new URL(config.url);
     } catch (error) {
-      config.url = `http://${hostname}:${port}${config.url}`;
+      config.url = `/internal/${service}${config.url}`;
     }
   }
-  // testing proxy
-  config.url = `https://console.stage.redhat.com${config.url}`;
   if (!config.headers) {
     config.headers = {};
   }
-  // config.headers['x-rh-identity'] = state.identity;
-  console.log(config.headers['x-rh-identity']);
   console.log(config.url);
-  console.log(window.__endpoints__);
   return axios(config)
     .then((response: AxiosResponse) => response.data)
     .catch((error) => {

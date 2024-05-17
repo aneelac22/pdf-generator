@@ -23,11 +23,16 @@ import { UpdateStatus } from '../utils';
 import { cluster } from '../cluster';
 import { generatePdf } from '../../browser/clusterTask';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import createInternalProxies from './createInternalProxies';
 
 const router = Router();
 const pdfCache = PdfCache.getInstance();
 
 let hasProxy = false;
+
+createInternalProxies().forEach((proxy) => {
+  router.use(proxy);
+});
 
 function addProxy(req: GenerateHandlerRequest) {
   if (!hasProxy) {
