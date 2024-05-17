@@ -54,7 +54,21 @@ function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
       config.url = `http://${hostname}:${port}${config.url}`;
     }
   }
-  return axios(config).then((response: AxiosResponse) => response.data);
+  // testing proxy
+  config.url = `https://console.stage.redhat.com${config.url}`;
+  if (!config.headers) {
+    config.headers = {};
+  }
+  // config.headers['x-rh-identity'] = state.identity;
+  console.log(config.headers['x-rh-identity']);
+  console.log(config.url);
+  console.log(window.__endpoints__);
+  return axios(config)
+    .then((response: AxiosResponse) => response.data)
+    .catch((error) => {
+      console.error(error);
+      throw error;
+    });
 }
 
 type FetchData = (createAsyncRequest: CreateAxiosRequest) => Promise<unknown>;
