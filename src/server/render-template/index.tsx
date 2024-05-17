@@ -48,7 +48,7 @@ function renderTemplate(payload: GeneratePayload) {
       2
     )};
 window.__endpoints__ = ${JSON.stringify(instanceConfig.endpoints, null, 2)}
-window.IS_PRODUCTION = ${process.env.IS_PRODUCTION}</script>`
+window.IS_PRODUCTION = ${instanceConfig.IS_PRODUCTION}</script>`
   );
 
   return template;
