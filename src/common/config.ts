@@ -8,11 +8,13 @@ import {
 } from 'app-common-js';
 import { UPDATE_TOPIC } from '../browser/constants';
 import * as fs from 'fs';
+import { ServiceNames, ServicesEndpoints } from '../integration/endpoints';
 
 const defaultConfig: {
   webPort: number;
   metricsPort: number;
   metricsPath: string;
+  endpoints: Partial<ServicesEndpoints>;
   tlsCAPath: string;
   objectStore: {
     hostname: string;
@@ -50,6 +52,7 @@ const defaultConfig: {
   webPort: 8000,
   metricsPort: 9001,
   metricsPath: '/metrics',
+  endpoints: {},
   tlsCAPath: '',
   objectStore: {
     hostname: 'localhost',
@@ -137,6 +140,7 @@ const defaultConfig: {
 
 function initializeConfig() {
   let isClowderEnabled = false;
+  const endpoints: Partial<ServicesEndpoints> = {};
   try {
     let config: typeof defaultConfig = {
       ...defaultConfig,
@@ -145,6 +149,16 @@ function initializeConfig() {
     isClowderEnabled = IsClowderEnabled();
     if (isClowderEnabled) {
       const clowderConfig = clowder.LoadedConfig();
+      if (clowderConfig.endpoints) {
+        clowderConfig.endpoints.forEach((endpoint) => {
+          endpoints[endpoint.app as ServiceNames] = {
+            app: endpoint.app,
+            hostname: endpoint.hostname,
+            name: endpoint.name,
+            port: endpoint.port,
+          };
+        });
+      }
       if (clowderConfig.kafka.brokers[0].cacert != undefined) {
         try {
           fs.writeFileSync(
@@ -158,6 +172,7 @@ function initializeConfig() {
       config = {
         ...defaultConfig,
         ...clowderConfig,
+        endpoints,
       };
     }
     return config;
