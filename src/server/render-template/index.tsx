@@ -4,6 +4,7 @@ import { GeneratePayload } from '../../common/types';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Header from './Header';
 import Footer from './Footer';
+import instanceConfig from '../../common/config';
 
 export function getHeaderAndFooterTemplates(): {
   headerTemplate: string;
@@ -45,7 +46,9 @@ function renderTemplate(payload: GeneratePayload) {
       payload,
       null,
       2
-    )}</script>`
+    )};
+window.__endpoints__ = ${JSON.stringify(instanceConfig.endpoints, null, 2)}
+window.IS_PRODUCTION = ${process.env.IS_PRODUCTION}</script>`
   );
 
   return template;

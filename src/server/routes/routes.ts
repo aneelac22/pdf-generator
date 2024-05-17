@@ -66,7 +66,7 @@ function addProxy(req: GenerateHandlerRequest) {
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
-      logger: console,
+      logger: apiLogger,
     });
     const apiProxy = createProxyMiddleware({
       target: config.scalprum.apiHost,
@@ -88,7 +88,6 @@ function addProxy(req: GenerateHandlerRequest) {
           );
           proxyReq.setHeader('Origin', config.scalprum.apiHost);
           proxyReq.setHeader('Host', strippedHost);
-          proxyReq.setHeader('Access-Control-Request-Method', 'GET');
           proxyReq.setHeader('referer', 'content-type');
           proxyReq.setHeader('x-forwarded-host', config.scalprum.apiHost);
 
@@ -98,7 +97,7 @@ function addProxy(req: GenerateHandlerRequest) {
           proxyReq.removeHeader(config.AUTHORIZATION_CONTEXT_KEY);
         },
       },
-      logger: console,
+      logger: apiLogger,
     });
     router.use(assetsProxy);
     router.use(apiProxy);

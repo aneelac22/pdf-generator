@@ -9,10 +9,13 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GeneratePayload } from '../common/types';
+import { ServiceNames, ServicesEndpoints } from '../integration/endpoints';
 
 declare global {
   interface Window {
     __initialState__: GeneratePayload;
+    __endpoints__: Partial<ServicesEndpoints>;
+    IS_PRODUCTION: boolean;
   }
 }
 
@@ -24,9 +27,33 @@ const config: AppsConfig = {
   },
 };
 
-type CreateAxiosRequest = (config: AxiosRequestConfig) => Promise<unknown>;
+type CreateAxiosRequest = (
+  service: ServiceNames,
+  config: AxiosRequestConfig
+) => Promise<unknown>;
 
-function createAxiosRequest(config: AxiosRequestConfig) {
+function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
+  if (window.IS_PRODUCTION && !window.__endpoints__[service]) {
+    const message = `Service ${service} not found! Available services: ${Object.keys(
+      window.__endpoints__
+    ).join(', ')}.\n You might need to add service integration in the config.`;
+    console.error(message);
+    throw new Error(message);
+  }
+
+  if (!config.url) {
+    throw new Error('URL is required');
+  }
+  if (window.IS_PRODUCTION) {
+    const endpoint = window.__endpoints__[service]!;
+    const { hostname, port } = endpoint ?? {};
+    try {
+      // This will fail if the URL does not have hostname and protocol
+      new URL(config.url);
+    } catch (error) {
+      config.url = `http://${hostname}:${port}${config.url}`;
+    }
+  }
   return axios(config).then((response: AxiosResponse) => response.data);
 }
 
