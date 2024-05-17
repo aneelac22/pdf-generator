@@ -57,8 +57,6 @@ objects:
           value: ${LOG_LEVEL}
         - name: ASSETS_HOST
           value: ${ASSETS_HOST}
-        - name: API_HOST
-          value: ${API_HOST}
         - name: PROXY_AGENT
           value: ${PROXY_AGENT}
         resources:
@@ -116,9 +114,6 @@ parameters:
   value: "false"
 - description: Scalprum template ASSETS host
   name: ASSETS_HOST
-  value: "blank"
-- description: Scalprum template API host
-  name: API_HOST
   value: "blank"
 - description: Proxy agent
   name: PROXY_AGENT

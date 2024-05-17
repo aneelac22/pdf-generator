@@ -4,9 +4,21 @@ import { ServiceNames } from '../../integration/endpoints';
 import { Endpoint } from 'app-common-js';
 import { apiLogger } from '../../common/logging';
 
-console.log('Available endpoints: ', instanceConfig.endpoints);
+const API_HOST = instanceConfig.scalprum.apiHost;
 
 function createInternalProxies() {
+  // skip internal routing if API_HOST is set
+  if (API_HOST && API_HOST !== 'blank') {
+    const internalRegEx = /^\/internal\/[^/]+/;
+    const proxy = createProxyMiddleware({
+      logger: apiLogger,
+      target: API_HOST,
+      changeOrigin: true,
+      pathFilter: (path) => path.startsWith('/internal'),
+      pathRewrite: (path) => path.replace(internalRegEx, ''),
+    });
+    return [proxy];
+  }
   const meta = Object.entries(instanceConfig.endpoints).reduce<
     Partial<{
       [key in ServiceNames]: Endpoint;
