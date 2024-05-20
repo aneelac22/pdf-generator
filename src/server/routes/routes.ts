@@ -273,8 +273,8 @@ router.post(
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
       await cluster.idle();
+      // Do no close the cluster!
       apiLogger.debug('task finished');
-      await cluster.close();
     }
   }
 );

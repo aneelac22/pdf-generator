@@ -8,6 +8,7 @@ export const GetPupCluster = async () => {
   const cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_CONTEXT,
     maxConcurrency: 1,
+    retryLimit: 2,
     puppeteerOptions: {
       timeout: BROWSER_TIMEOUT,
       ...(config?.IS_PRODUCTION
