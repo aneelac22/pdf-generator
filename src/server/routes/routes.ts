@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import fs from 'fs';
 import crypto from 'crypto';
-import PdfCache from '../../common/pdfCache';
+import PdfCache, { PdfStatus } from '../../common/pdfCache';
 import { PdfGenerationError } from '../errors';
 import { Router, Request } from 'express';
 import httpContext from 'express-http-context';
@@ -202,7 +202,7 @@ router.post(
         apiLogger.debug(`Single call to generator queued for ${collectionId}`);
         await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
-          status: 'Generating',
+          status: PdfStatus.Generating,
           filepath: '',
           componentId: pdfDetails.uuid,
           collectionId,
@@ -222,7 +222,7 @@ router.post(
         apiLogger.debug(`Queueing ${requiredCalls} for ${collectionId}`);
         await generatePdf(pdfDetails, collectionId);
         const updateMessage = {
-          status: 'Generating',
+          status: PdfStatus.Generating,
           filepath: '',
           componentId: pdfDetails.uuid,
           collectionId: collectionId,
@@ -235,24 +235,26 @@ router.post(
       if (error instanceof PdfGenerationError) {
         if (error.message.includes('No API descriptor')) {
           const updateMessage = {
-            status: `Failed: ${error.message}`,
+            status: PdfStatus.Failed,
             filepath: '',
             collectionId: error.collectionId,
             componentId: error.componentId,
           };
-          apiLogger.error(`Error: ${error}`);
+          apiLogger.error(
+            `Error: ${error.message}; Collection: ${error.collectionId}`
+          );
           UpdateStatus(updateMessage);
           res.status(400).send({
             error: {
               status: 400,
               statusText: 'Bad Request',
-              description: `${error}`,
+              description: error.message,
             },
           });
         } else {
-          apiLogger.error(`Internal Server error: ${error}`);
+          apiLogger.error(`Internal Server error: ${error.message}`);
           const updateMessage = {
-            status: `Failed: ${error}`,
+            status: PdfStatus.Failed,
             filepath: '',
             collectionId: error.collectionId,
             componentId: error.componentId,
@@ -262,7 +264,7 @@ router.post(
             error: {
               status: 500,
               statusText: 'Internal server error',
-              description: `${error}`,
+              description: error.message,
             },
           });
         }

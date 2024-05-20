@@ -1,15 +1,15 @@
 const { defaults: tsjPreset } = require('ts-jest/presets');
 
 module.exports = {
-  rootDir: './src/tests-visual-regression',
+  displayName: 'unit-test',
   bail: 0,
   testTimeout: 30000,
   moduleNameMapper: {
     '\\.(css|scss)$': 'identity-obj-proxy',
   },
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   transform: {
     ...tsjPreset.transform,
   },
-  preset: 'jest-puppeteer',
+  testMatch: ['./**/*.spec.ts'],
 };
