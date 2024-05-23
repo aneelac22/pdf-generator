@@ -1,5 +1,4 @@
 import os from 'os';
-import fs from 'fs';
 import { PdfRequestBody } from '../common/types';
 import { apiLogger } from '../common/logging';
 import { pageHeight, pageWidth, setWindowProperty } from './helpers';
@@ -10,31 +9,10 @@ import { uploadPDF } from '../common/objectStore';
 import { UpdateStatus, isValidPageResponse } from '../server/utils';
 import { PdfGenerationError } from '../server/errors';
 import { cluster } from '../server/cluster';
-import { HTTPRequest, Page } from 'puppeteer';
+import { Page } from 'puppeteer';
 
 // Match the timeout on the gateway
 const BROWSER_TIMEOUT = 60_000;
-
-const redirectFontFiles = async (request: HTTPRequest) => {
-  if (request.url().endsWith('.woff') || request.url().endsWith('.woff2')) {
-    const modifiedUrl = request.url().replace(/^http:\/\/localhost:8000\//, '');
-    const fontFile = `./dist/${modifiedUrl}`;
-    fs.readFile(fontFile, async (err, data) => {
-      if (err) {
-        await request.respond({
-          status: 404,
-          body: `An error occurred while loading font ${modifiedUrl} : ${err.message}`,
-        });
-      }
-      await request.respond({
-        body: data,
-        status: 200,
-      });
-    });
-  } else {
-    await request.continue();
-  }
-};
 
 const getNewPdfName = (id: string) => {
   const pdfFilename = `report_${id}.pdf`;
@@ -97,12 +75,6 @@ export const generatePdf = async (
       }
 
       await page.setExtraHTTPHeaders(extraHeaders);
-
-      // Intercept font requests from chrome and send them from dist
-      await page.setRequestInterception(true);
-      page.on('request', async (request) => {
-        await redirectFontFiles(request);
-      });
 
       const pageResponse = await page.goto(url, {
         waitUntil: 'networkidle2',

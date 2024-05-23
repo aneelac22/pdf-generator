@@ -1,9 +1,44 @@
+import { apiLogger } from './logging';
+
 export enum PdfStatus {
   Generating = 'Generating',
   Generated = 'Generated',
   Failed = 'Failed',
   NotFound = 'NotFound',
 }
+
+// 8 hour timeout on cache entries
+const EIGHT_HOURS = 8 * 60 * 60 * 1000;
+export const ENTRY_TIMEOUT = process.env.ENTRY_TIMEOUT
+  ? parseInt(process.env.ENTRY_TIMEOUT, 10)
+  : EIGHT_HOURS;
+
+// Return the highest unit with english suffix
+// 3000 => 3 seconds
+const formatTimeToEnglish = (milliseconds: number): string => {
+  const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+  const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
+
+  // Determine the largest unit
+  let largestUnit = '';
+  if (hours > 0) {
+    largestUnit = 'hours';
+  } else if (minutes > 0) {
+    largestUnit = 'minutes';
+  } else if (seconds > 0) {
+    largestUnit = 'seconds';
+  }
+
+  // Return the largest unit with its value
+  return `${Math.abs(
+    largestUnit === 'hours'
+      ? hours
+      : largestUnit === 'minutes'
+      ? minutes
+      : seconds
+  )} ${largestUnit}`;
+};
 
 export type PdfEntry = {
   status: string;
@@ -42,12 +77,19 @@ class PdfCache {
   }
 
   public addToCollection(collectionId: string, status: PDFComponent): void {
+    if (!collectionId) {
+      apiLogger.debug('no collectionId found');
+      return;
+    }
     const currentEntry = this.data[collectionId];
     if (!currentEntry) {
       this.data[collectionId] = {
         components: [],
         status: PdfStatus.Generating,
       };
+      // Only add cache cleaner once. The entire collection will only last
+      // ENTRY_TIMEOUT hours
+      this.cleanExpiredCollection(collectionId);
     }
     // replace
     this.data[collectionId].components = this.data[
@@ -100,6 +142,19 @@ class PdfCache {
       return true;
     }
     return false;
+  }
+
+  public cleanExpiredCollection(uuid: string) {
+    apiLogger.debug(
+      `Timeout for ${uuid} has been set to ${formatTimeToEnglish(
+        ENTRY_TIMEOUT
+      )}`
+    );
+    setTimeout(() => {
+      // This should potentially also call the objectStore to remove the PDF(s)
+      apiLogger.debug(`Removing expired collection ${uuid}`);
+      this.deleteCollection(uuid);
+    }, ENTRY_TIMEOUT);
   }
 }
 
