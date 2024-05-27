@@ -52,7 +52,10 @@ function createAxiosRequest(service: ServiceNames, config: AxiosRequestConfig) {
     });
 }
 
-type FetchData = (createAsyncRequest: CreateAxiosRequest) => Promise<unknown>;
+type FetchData = (
+  createAsyncRequest: CreateAxiosRequest,
+  options?: GeneratePayload['fetchDataParams']
+) => Promise<unknown>;
 
 type AsyncState = {
   loading: boolean;
@@ -99,7 +102,7 @@ const MetadataWrapper = () => {
         setAsyncState({ loading: false, error: null, data: null });
         return;
       }
-      const data = await fn(createAxiosRequest);
+      const data = await fn(createAxiosRequest, state.fetchDataParams);
 
       setAsyncState({ loading: false, error: null, data });
     } catch (error) {
