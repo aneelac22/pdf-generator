@@ -132,7 +132,12 @@ const MetadataWrapper = () => {
     importName: state.importName,
     ErrorComponent: <FetchErrorFallback />,
   };
-  return <ScalprumComponent {...props} />;
+  return (
+    // ensure CSS scope is applied
+    <div className={state.scope}>
+      <ScalprumComponent {...props} />
+    </div>
+  );
 };
 
 const App = () => {
