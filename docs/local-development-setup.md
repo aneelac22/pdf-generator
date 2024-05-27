@@ -1,9 +1,11 @@
-# PDF Template development
+# Local development setup
 
 ## Prerequisites
 
+[**All used APIs were integrated with PDF generator**](./API-integration.md)
+
 - node 18 or greater installed
-- `npm` or `yarn` cli installed
+- `npm` cli installed
 - etc hosts patched (same requirement as for any HCC local UI development)
 - docker-compose or podman-compose CLI installed 
 
@@ -137,17 +139,6 @@ Use the usually development scripts for your application. The default command:
 npm run start
 ```
 
-## React PDF templates
+## Next steps
 
-The template creation is the same exact process as if creating a regular react component with one exception.
-
-The exception is [data fetching](#data-fetching). Do not fetch data during render! Results are not guaranteed.
-
-In addition, the root component will always receive a `asyncData` prop.
-
-> Finish describing the prop
-
-## Data fetching
-
-> Finish describing the data fetching
-
+Learn more about [PDF Template development](./pdf-template-development.md).

@@ -36,3 +36,7 @@ networkPoliciesAllow:
   # rest of your policies
   - $ref: /services/insights/crc-pdf-generator/namespaces/crc-pdf-generator-stage.yml
 ```
+
+## Next steps
+
+With API integrated, you can lean about [Local development setup](./local-development-setup.md)
