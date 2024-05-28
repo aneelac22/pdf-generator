@@ -1,7 +1,7 @@
 import { Kafka, SASLOptions } from 'kafkajs';
 import config from '../common/config';
 import { apiLogger } from './logging';
-import PdfCache from './pdfCache';
+import PdfCache, { PDFComponent } from './pdfCache';
 import { KafkaBroker } from 'app-common-js';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -103,7 +103,9 @@ export async function produceMessage(topic: string, message: unknown) {
 export async function consumeMessages(topic: string) {
   const consumer = kafka.consumer({ groupId: `pdf-gen-${os.hostname()}` });
   await consumer.connect();
-  await consumer.subscribe({ topic: topic, fromBeginning: true });
+  // Don't read from the beginning. Messages from not-yet-expired objects on the topic
+  // will contain paths to PDFs that are not on the new pod
+  await consumer.subscribe({ topic: topic });
 
   await consumer.run({
     // ESlint is upset here but it has to be async due to kafkajs
@@ -115,13 +117,28 @@ export async function consumeMessages(topic: string) {
         })
       );
       const cacheObject = JSON.parse(message.value?.toString() as string);
-      pdfCache.addToCollection(cacheObject?.id, {
-        status: cacheObject.status,
-        filepath: cacheObject.filepath,
-        collectionId: cacheObject.collectionId,
-        componentId: cacheObject.componentId,
-      });
-      apiLogger.debug(JSON.stringify(pdfCache));
+      let updateMessage;
+      try {
+        if (
+          cacheObject.collectionId !== undefined &&
+          cacheObject.collectionId !== ''
+        ) {
+          updateMessage = cacheObject as PDFComponent;
+          apiLogger.debug(
+            `Updated message for collection ${updateMessage.collectionId}`
+          );
+        } else {
+          throw new Error('Invalid message format');
+        }
+        pdfCache.addToCollection(updateMessage.collectionId, {
+          status: updateMessage.status,
+          filepath: updateMessage.filepath,
+          collectionId: updateMessage.collectionId,
+          componentId: updateMessage.componentId,
+        });
+      } catch (error) {
+        apiLogger.debug(`Message sync error: ${JSON.stringify(error)}`);
+      }
     },
   });
 }

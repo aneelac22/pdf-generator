@@ -51,8 +51,6 @@ objects:
         env:
         - name: CLOWDER_ENABLED
           value: ${CLOWDER_ENABLED}
-        - name: COMPLIANCE_API_URL
-          value: ${COMPLIANCE_API_SCHEME}://${COMPLIANCE_HOST}:${COMPLIANCE_API_PORT}
         - name: LOG_LEVEL
           value: ${LOG_LEVEL}
         - name: ASSETS_HOST
@@ -94,15 +92,6 @@ parameters:
   name: ENV_NAME
   value: "crc-pdf-generator"
   required: true
-- description: Compliance API http scheme
-  name: COMPLIANCE_API_SCHEME
-  value: "http"
-- description: Compliance API hostname
-  name: COMPLIANCE_HOST
-  value: "foo"
-- description: Compliance API port
-  name: COMPLIANCE_API_PORT
-  value: "8000"
 - description: Logging level for the server
   name: LOG_LEVEL
   value: "debug"
@@ -118,3 +107,6 @@ parameters:
 - description: Proxy agent
   name: PROXY_AGENT
   value: "blank"
+- description: Retention time span for pdf in MS (8 hours default)
+  name: ENTRY_TIMEOUT
+  value: "28800000"

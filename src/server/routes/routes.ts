@@ -236,6 +236,7 @@ router.post(
         if (error.message.includes('No API descriptor')) {
           const updateMessage = {
             status: PdfStatus.Failed,
+            error: error.message,
             filepath: '',
             collectionId: error.collectionId,
             componentId: error.componentId,
@@ -268,13 +269,30 @@ router.post(
             },
           });
         }
+        apiLogger.error(`Internal Server error: ${JSON.stringify(error)}`);
+        const updateMessage = {
+          status: PdfStatus.Failed,
+          error: JSON.stringify(error),
+          filepath: '',
+          collectionId: error.collectionId,
+          componentId: error.componentId,
+        };
+        UpdateStatus(updateMessage);
+        res.status(500).send({
+          error: {
+            status: 500,
+            statusText: 'Internal server error',
+            description: `${JSON.stringify(error)}`,
+          },
+        });
       }
     } finally {
       // To handle the edge case where a pool terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
       await cluster.idle();
+      // Do not close the cluster!
       apiLogger.debug('task finished');
-      await cluster.close();
+      apiLogger.debug(JSON.stringify(pdfCache));
     }
   }
 );
