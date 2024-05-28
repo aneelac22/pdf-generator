@@ -26,7 +26,7 @@ Follow the check list to integrate your service with the PDF generator
 1. [API integration](./docs/API-integration.md)
 2. [Local development setup](./docs/local-development-setup.md)
 3. [PDF Template development](./docs/pdf-template-development.md)
-4. [Creating PDF API request](./docs/creating-api-reqesust.md)
+4. [Creating PDF API request](./docs/creating-api-requests.md)
 
 ## Endpoints
 You currently have 2 choices for generating any of the available templates:
@@ -67,7 +67,6 @@ fetch('/api/crc-pdf-generator/v2/create', {
   headers: {
     // do not forget the content type header!
     'Content-Type': 'application/json',
-    'x-rh-identity': 'eyJpZGVudGl0eSI6eyJ1c2VyIjp7InVzZXJfaWQiOiIxMiJ9fX0='
   },
 
   body: JSON.stringify({

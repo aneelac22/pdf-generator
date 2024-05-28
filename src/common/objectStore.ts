@@ -14,6 +14,16 @@ import PdfCache from './pdfCache';
 
 const asyncWriteFile = promisify(writeFile);
 
+const getFileOrderFromPath = (filepath: string): number => {
+  const stems = filepath.split('/');
+  const orderNumber = stems[stems.length - 1].replace('.pdf', '');
+  return parseInt(orderNumber, 10);
+};
+
+const filepathSort = (a: string, b: string) => {
+  return getFileOrderFromPath(a) - getFileOrderFromPath(b);
+};
+
 export const StorageClient = () => {
   if (config?.objectStore.tls) {
     apiLogger.debug('aws config');
@@ -104,6 +114,7 @@ export const downloadPDF = async (id: string) => {
   const components = collection.components.map(
     (component) => `${component.componentId}.pdf`
   );
+  apiLogger.debug(components);
   const tmpdir = `/tmp/${id}-components/*`;
   ensureDirSync(tmpdir);
   try {
@@ -121,6 +132,7 @@ export const downloadPDF = async (id: string) => {
     // Send the GetObjectCommand to S3
     const fragments = await Promise.all(tasks);
     const fragmentNames: string[] = [];
+    // Since these are indexed, we know the order and can sort later
     const writeTasks = fragments.map((fragment, index) => {
       return new Promise<void>((resolve, reject) => {
         const fragmentName = `${tmpdir}/${index}.pdf`;
@@ -140,11 +152,13 @@ export const downloadPDF = async (id: string) => {
 
     await Promise.all(writeTasks);
     const merger = new PDFMerger();
-    const addTasks: Promise<void>[] = [];
-    fragmentNames.forEach((fragmentName) => {
-      addTasks.push(merger.add(fragmentName));
-    });
-    await Promise.all(addTasks);
+
+    // Ensure order of files before merging
+    fragmentNames.sort(filepathSort);
+    // Don't use a Promise.all() to ensure order is deterministic
+    for (const file of fragmentNames) {
+      await merger.add(file);
+    }
     const buffer = await merger.saveAsBuffer();
 
     apiLogger.debug(`PDF found downloading as ${id}.pdf`);

@@ -30,6 +30,7 @@
     "http-proxy-middleware": "^3.0.0",
     "ignore-styles": "^5.0.1",
     "kafkajs": "^2.2.4",
+    "pdf-lib": "^1.17.1",
     "pdf-merger-js": "^5.1.1",
     "prom-client": "^15.1.2",
     "puppeteer": "^22.7.1",

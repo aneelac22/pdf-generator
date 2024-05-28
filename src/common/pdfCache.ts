@@ -59,6 +59,7 @@ export type PDFComponent = {
   collectionId: string;
   componentId: string;
   error?: string;
+  numPages?: number;
 };
 
 class PdfCache {
@@ -106,6 +107,24 @@ class PdfCache {
 
   public deleteCollection(id: string) {
     delete this.data[id];
+  }
+
+  public getComponents(collectionId: string) {
+    if (this.data[collectionId]) {
+      return this.data[collectionId].components;
+    }
+    return [];
+  }
+
+  public getTotalPagesForCollection(collectionId: string) {
+    let pageCount = 0;
+    const components = this.getComponents(collectionId);
+    if (components?.length > 1) {
+      components.forEach((n) => {
+        pageCount += n.numPages || 0;
+      });
+    }
+    return pageCount;
   }
 
   private updateCollectionState(

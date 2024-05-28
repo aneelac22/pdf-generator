@@ -135,6 +135,7 @@ export async function consumeMessages(topic: string) {
           filepath: updateMessage.filepath,
           collectionId: updateMessage.collectionId,
           componentId: updateMessage.componentId,
+          numPages: updateMessage?.numPages || 0,
         });
       } catch (error) {
         apiLogger.debug(`Message sync error: ${JSON.stringify(error)}`);
