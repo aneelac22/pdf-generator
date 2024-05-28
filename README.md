@@ -21,7 +21,12 @@ oc port-forward -n crc-pdf-generator svc/crc-pdf-generator-api 8000:8000
 
 ## Service Integration
 
-~~Please follow the [Integration guide](./INTEGRATION.md).~~
+Follow the check list to integrate your service with the PDF generator
+
+1. [API integration](./docs/API-integration.md)
+2. [Local development setup](./docs/local-development-setup.md)
+3. [PDF Template development](./docs/pdf-template-development.md)
+4. [Creating PDF API request](./docs/creating-api-reqesust.md)
 
 ## Endpoints
 You currently have 2 choices for generating any of the available templates:
@@ -50,11 +55,6 @@ The preview endpoint will instead return the pdf preview environment:
 While this endpoint is currently only available for local testing, the preview environment will eventually be exposed in
 production as well.
 
-### Endpoint Options
-```
- `?template=x // See service-names for available templates. Required unless you want a hello world.` 
- `?orientation= landscape // optional`
-```
 
 ## Downloading a report in the browser
 
