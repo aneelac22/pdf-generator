@@ -191,8 +191,6 @@ router.post(
     try {
       const requiredCalls = requestConfigs.length;
       if (requiredCalls === 1) {
-        // need to support multiple IDs in a group
-        // and await the results to combine
         const pdfDetails = getPdfRequestBody(requestConfigs[0]);
         const configHeaders: string | string[] | undefined =
           req.headers[config?.OPTIONS_HEADER_NAME];
@@ -210,8 +208,6 @@ router.post(
         UpdateStatus(updateMessage);
         return res.status(202).send({ statusID: collectionId });
       }
-      // add these in a loop
-      // LOOP based on payload length
       for (let x = 0; x < Number(requiredCalls); x++) {
         const pdfDetails = getPdfRequestBody(requestConfigs[x]);
         const configHeaders: string | string[] | undefined =

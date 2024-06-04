@@ -10,9 +10,11 @@ import { UpdateStatus, isValidPageResponse } from '../server/utils';
 import { PdfGenerationError } from '../server/errors';
 import { cluster } from '../server/cluster';
 import { Page } from 'puppeteer';
+import { PDFDocument } from 'pdf-lib';
 
 // Match the timeout on the gateway
 const BROWSER_TIMEOUT = 60_000;
+const pdfCache = PdfCache.getInstance();
 
 const getNewPdfName = (id: string) => {
   const pdfFilename = `report_${id}.pdf`;
@@ -34,7 +36,8 @@ export const generatePdf = async (
   const createFilename = async (): Promise<string> => {
     await cluster.queue(async ({ page }: { page: Page }) => {
       await page.setViewport({ width: pageWidth, height: pageHeight });
-
+      const offsetSize = pdfCache.getTotalPagesForCollection(collectionId);
+      apiLogger.debug(`PDF offset by: ${offsetSize}`);
       // Enables console logging in Headless mode - handy for debugging components
       page.on('console', (msg) =>
         apiLogger.info(`[Headless log] ${msg.text()}`)
@@ -146,9 +149,24 @@ export const generatePdf = async (
       }
 
       const { headerTemplate, footerTemplate } = getHeaderAndFooterTemplates();
+      // Pain.
+      await page.addStyleTag({
+        content:
+          '.empty-page { page-break-after: always; visibility: hidden; }',
+      });
+      await page.evaluate((offsetSize) => {
+        Array.from({ length: offsetSize }).forEach(() => {
+          const emptyPage = document.createElement('div');
+          emptyPage.className = 'empty-page';
+          emptyPage.textContent = 'empty';
+          document.body.prepend(emptyPage);
+          return emptyPage;
+        });
+      }, offsetSize);
+      const pageRange = `${offsetSize + 1}-`;
 
       try {
-        await page.pdf({
+        const buffer = await page.pdf({
           path: pdfPath,
           format: 'a4',
           printBackground: true,
@@ -159,19 +177,24 @@ export const generatePdf = async (
           displayHeaderFooter: true,
           headerTemplate,
           footerTemplate,
+          pageRanges: pageRange,
           timeout: BROWSER_TIMEOUT,
         });
         uploadPDF(componentId, pdfPath).catch((error: unknown) => {
           apiLogger.error(`Failed to upload PDF: ${error}`);
         });
+        const pdfDoc = await PDFDocument.load(buffer);
+        const numPages = pdfDoc.getPages().length;
+        apiLogger.debug(`Generated PDF with ${numPages} pages`);
         const updated = {
           collectionId,
           status: PdfStatus.Generated,
           filepath: pdfPath,
           componentId: componentId,
+          numPages: numPages,
         };
         UpdateStatus(updated);
-        PdfCache.getInstance().verifyCollection(collectionId);
+        pdfCache.verifyCollection(collectionId);
       } catch (error: unknown) {
         const updated = {
           collectionId,
@@ -193,7 +216,6 @@ export const generatePdf = async (
       } finally {
         await page.close();
       }
-      return pdfPath;
     });
 
     return pdfPath;
