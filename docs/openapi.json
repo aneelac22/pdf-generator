@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "title": "CRC PDF Generator",
     "contact": {
+      "name": "RedHatInsights",
       "email": "support@redhat.com"
     },
     "description": "CRC PDF Generator API Documentation",
@@ -19,12 +20,12 @@
   ],
   "tags": [
     {
-      "name": "pdf",
-      "description": "related to previewing or generating a PDF"
-    },
-    {
       "name": "health",
       "description": "related to getting the status of the API"
+    },
+    {
+      "name": "pdf",
+      "description": "related to previewing or generating a PDF"
     }
   ],
   "paths": {
@@ -33,6 +34,8 @@
         "tags": [
           "health"
         ],
+        "operationId": "v1Hello",
+        "summary": "Returns hello world",
         "description": "Hello world endpoint",
         "responses": {
           "200": {
@@ -41,46 +44,14 @@
               "text/html": {
                 "schema": {
                   "type": "string"
+                },
+                "examples": {
+                  "html": {
+                    "value": "<h1>it's alive</h1>"
+                  }
                 }
               }
             }
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        }
-      }
-    },
-    "/v1/generate": {
-      "post": {
-        "tags": [
-          "pdf"
-        ],
-        "deprecated": true,
-        "description": "Generate a PDF from a predefined template",
-        "requestBody": {
-          "description": "Body containing template data",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PdfDetails"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Returns a PDF based on the service and template in the query string",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "$ref": "#/components/schemas/RenderedPdf"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
           },
           "403": {
             "$ref": "#/components/responses/Unauthorized"
@@ -96,6 +67,7 @@
         "tags": [
           "pdf"
         ],
+        "operationId": "createPdf",
         "description": "Generate a PDF from a predefined template",
         "requestBody": {
           "description": "Body containing template data",
@@ -128,11 +100,12 @@
         "tags": [
           "pdf"
         ],
+        "operationId": "getPdfStatus",
         "parameters": [
           {
             "name": "statusID",
             "in": "path",
-            "description": "ID of PDF",
+            "description": "ID of Pdf Collection",
             "required": true,
             "schema": {
               "type": "string",
@@ -143,7 +116,7 @@
         "description": "Fetch the status of a PDF by the ID",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/PdfStatus"
+            "$ref": "#/components/responses/PdfCollection"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -165,11 +138,12 @@
         "tags": [
           "pdf"
         ],
+        "operationId": "downloadPdf",
         "parameters": [
           {
             "name": "ID",
             "in": "path",
-            "description": "ID of PDF",
+            "description": "ID of Pdf Collection to be downloaded",
             "required": true,
             "schema": {
               "type": "string",
@@ -260,12 +234,12 @@
           }
         }
       },
-      "PdfStatus": {
+      "PdfCollection": {
         "description": "Returns a status object for the PDF being generated",
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/PdfStatus"
+              "$ref": "#/components/schemas/PdfCollection"
             }
           }
         }
@@ -274,6 +248,7 @@
     "schemas": {
       "Error403": {
         "type": "object",
+        "description": "Error schema for 403 HTTP code",
         "properties": {
           "code": {
             "type": "string"
@@ -285,6 +260,7 @@
       },
       "Error400": {
         "type": "object",
+        "description": "Error schema for 400 HTTP code",
         "properties": {
           "error": {
             "type": "object",
@@ -304,6 +280,7 @@
       },
       "Error404": {
         "type": "object",
+        "description": "Error schema for 404 HTTP code",
         "properties": {
           "error": {
             "type": "object",
@@ -323,6 +300,7 @@
       },
       "Error500": {
         "type": "object",
+        "description": "Error schema for 500 HTTP code",
         "properties": {
           "error": {
             "type": "object",
@@ -340,50 +318,157 @@
           }
         }
       },
-      "PdfDetails": {
+      "PdfDetail": {
         "type": "object",
+        "description": "Payload shape for generating a PDF",
+        "required": [
+          "manifestLocation",
+          "scope",
+          "module"
+        ],
         "properties": {
-          "service": {
-            "type": "string"
+          "manifestLocation": {
+            "type": "string",
+            "description": "path of the manifest"
           },
-          "template": {
-            "type": "string"
+          "scope": {
+            "type": "string",
+            "description": "scope of the request"
+          },
+          "module": {
+            "type": "string",
+            "description": "federated module name"
           }
+        },
+        "example": {
+          "manifestLocation": "/apps/landing/fed-mods.json",
+          "scope": "landing",
+          "module": "./PdfEntry"
+        }
+      },
+      "PdfDetails": {
+        "type": "array",
+        "description": "Schema entry for the payload of creating a Pdf",
+        "items": {
+          "$ref": "#/components/schemas/PdfDetail"
         }
       },
       "PdfStatusId": {
+        "description": "Identifier used to keep track of a Pdf collection through the system",
         "type": "object",
         "properties": {
           "statusID": {
             "type": "string"
           }
+        },
+        "example": {
+          "statusID": "11011101"
+        }
+      },
+      "PdfComponent": {
+        "type": "object",
+        "description": "Status object for a single pdf component",
+        "required": [
+          "status",
+          "filepath",
+          "collectionId",
+          "componentId"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PdfStatus"
+          },
+          "filepath": {
+            "type": "string"
+          },
+          "collectionId": {
+            "type": "string"
+          },
+          "componentId": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "numPages": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PdfComponentGroup": {
+        "description": "Tracks multiple Pdf components",
+        "type": "object",
+        "required": [
+          "components",
+          "status"
+        ],
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PdfComponent"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/PdfStatus"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "PdfCollection": {
+        "type": "object",
+        "description": "Tracks the status for the entire collection",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PdfComponentGroup"
+          }
+        },
+        "example": {
+          "status": {
+            "components": [
+              {
+                "collectionId": "01197696-ca1b-4beb-80d2-6501126cb89e",
+                "status": "Generated",
+                "filepath": "/tmp/report_78584d8d-c5b9-444d-b2eb-b7ffc640d620.pdf",
+                "componentId": "78584d8d-c5b9-444d-b2eb-b7ffc640d620"
+              },
+              {
+                "collectionId": "01197696-ca1b-4beb-80d2-6501126cb89e",
+                "status": "Generated",
+                "filepath": "/tmp/report_99b81a67-a9f5-4a1e-82aa-1ef1840bce28.pdf",
+                "componentId": "99b81a67-a9f5-4a1e-82aa-1ef1840bce28"
+              }
+            ],
+            "status": "Generated"
+          }
         }
       },
       "PdfStatus": {
         "type": "object",
+        "description": "enum of all possible status types a Pdf can have",
         "properties": {
           "status": {
-            "type": "object",
-            "properties": {
-              "filepath": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              }
-            }
+            "type": "string",
+            "enum": [
+              "Generating",
+              "Generated",
+              "Failed",
+              "NotFound"
+            ]
           }
         }
       },
       "RenderedPdf": {
+        "description": "Pdf stream returned as media type pdf",
         "type": "string",
         "format": "binary"
       }
     }
-  },
-  "security": [
-    {
-      "x-rh-identity": []
-    }
-  ]
+  }
 }
