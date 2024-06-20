@@ -111,6 +111,10 @@ export const uploadPDF = async (id: string, path: string) => {
 export const downloadPDF = async (id: string) => {
   const bucket = config?.objectStore.buckets[0].name;
   const collection = PdfCache.getInstance().getCollection(id);
+  if (!collection) {
+    apiLogger.debug(`No collection found for ${id}`);
+    return '';
+  }
   const components = collection.components.map(
     (component) => `${component.componentId}.pdf`
   );
@@ -165,6 +169,6 @@ export const downloadPDF = async (id: string) => {
     return buffer;
   } catch (error) {
     apiLogger.debug(`Error downloading file: ${error}`);
-    throw error;
+    return '';
   }
 };
