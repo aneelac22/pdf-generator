@@ -83,9 +83,6 @@
           "202": {
             "$ref": "#/components/responses/GeneratingPdfId"
           },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
           "403": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -347,10 +344,18 @@
         }
       },
       "PdfDetails": {
-        "type": "array",
-        "description": "Schema entry for the payload of creating a Pdf",
-        "items": {
-          "$ref": "#/components/schemas/PdfDetail"
+        "type": "object",
+        "required": [
+          "payload"
+        ],
+        "properties": {
+          "payload": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PdfDetail"
+            },
+            "description": "Schema entry for the payload of creating a Pdf"
+          }
         }
       },
       "PdfStatusId": {

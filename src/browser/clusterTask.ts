@@ -225,7 +225,7 @@ export const generatePdf = async (
     .then((filename) => {
       return filename;
     })
-    // TODO: This seems dumb
+    // Throw the error up to the calling generator
     .catch((error) => {
       throw error;
     });

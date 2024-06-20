@@ -4,7 +4,6 @@ import 'dotenv/config';
 import fs from 'fs';
 import crypto from 'crypto';
 import PdfCache, { PdfStatus } from '../../common/pdfCache';
-import { PdfGenerationError } from '../errors';
 import { Router, Request } from 'express';
 import httpContext from 'express-http-context';
 import renderTemplate from '../render-template';
@@ -228,62 +227,26 @@ router.post(
 
       return res.status(202).send({ statusID: collectionId });
     } catch (error: unknown) {
-      if (error instanceof PdfGenerationError) {
-        if (error.message.includes('No API descriptor')) {
-          const updateMessage = {
-            status: PdfStatus.Failed,
-            error: error.message,
-            filepath: '',
-            collectionId: error.collectionId,
-            componentId: error.componentId,
-          };
-          apiLogger.error(
-            `Error: ${error.message}; Collection: ${error.collectionId}`
-          );
-          UpdateStatus(updateMessage);
-          res.status(400).send({
-            error: {
-              status: 400,
-              statusText: 'Bad Request',
-              description: error.message,
-            },
-          });
-        } else {
-          apiLogger.error(`Internal Server error: ${error.message}`);
-          const updateMessage = {
-            status: PdfStatus.Failed,
-            filepath: '',
-            collectionId: error.collectionId,
-            componentId: error.componentId,
-          };
-          UpdateStatus(updateMessage);
-          res.status(500).send({
-            error: {
-              status: 500,
-              statusText: 'Internal server error',
-              description: error.message,
-            },
-          });
-        }
-        apiLogger.error(`Internal Server error: ${JSON.stringify(error)}`);
-        const updateMessage = {
-          status: PdfStatus.Failed,
-          error: JSON.stringify(error),
-          filepath: '',
-          collectionId: error.collectionId,
-          componentId: error.componentId,
-        };
-        UpdateStatus(updateMessage);
-        res.status(500).send({
-          error: {
-            status: 500,
-            statusText: 'Internal server error',
-            description: `${JSON.stringify(error)}`,
-          },
-        });
-      }
+      // Only return a 500 error. 400's will be served by the status endpoint.
+      // We cannot validate a payload's parameters until the browser is running
+      apiLogger.error(`Internal Server error: ${JSON.stringify(error)}`);
+      const updateMessage = {
+        status: PdfStatus.Failed,
+        error: JSON.stringify(error),
+        filepath: '',
+        collectionId: collectionId,
+        componentId: '',
+      };
+      UpdateStatus(updateMessage);
+      res.status(500).send({
+        error: {
+          status: 500,
+          statusText: 'Internal server error',
+          description: `${JSON.stringify(error)}`,
+        },
+      });
     } finally {
-      // To handle the edge case where a pool terminates while the queue isn't empty,
+      // To handle the edge case where a cluster terminates while the queue isn't empty,
       // we ensure that the queue is empty and all workers are idle.
       await cluster.idle();
       // Do not close the cluster!
