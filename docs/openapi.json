@@ -454,18 +454,21 @@
           }
         }
       },
-      "PdfStatus": {
-        "type": "object",
-        "description": "enum of all possible status types a Pdf can have",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
+      "PdfStatusEnum": {
+        "type": "string",
+        "enum": [
               "Generating",
               "Generated",
               "Failed",
               "NotFound"
             ]
+      },
+      "PdfStatus": {
+        "type": "string",
+        "description": "enum of all possible status types a Pdf can have",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/PdfStatusEnum"
           }
         }
       },
